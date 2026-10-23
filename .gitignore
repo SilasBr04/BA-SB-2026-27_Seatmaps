@@ -1,0 +1,50 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.idea/
+.vscode/
+
+# Environment / secrets
+.env
+
+# Data and run outputs (keep folder structure)
+data/**
+!data/**/
+!data/**/.gitkeep
+runs/*
+!runs/.gitkeep
+
+# Videos
+*.mp4
+*.mov
+*.MP4
+*.MOV
+
+# Model weights
+*.pt
+*.pth
+*.onnx

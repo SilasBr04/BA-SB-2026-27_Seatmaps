@@ -1,0 +1,27 @@
+# Default pipeline configuration.
+# Experiment configs in configs/ override only the keys they change (`--config`).
+# The merged config is frozen into runs/<room>_<timestamp>/config.yaml.
+# Values marked "proposed" are starting points, not confirmed (docs/technical-setup.md).
+
+frames:
+  sample_fps: 3           # proposed
+  target_width: 1280      # px, proposed
+  num_keyframes: 40       # proposed; VGGT handles ~40-50 frames with 12 GB VRAM
+  min_sharpness_ratio: 0.5  # drop frames below this share of the mean Laplacian variance, proposed
+
+detection:
+  model: null             # YOLO26-seg weights (open)
+  tracker: null           # BoT-SORT or ByteTrack (open)
+  confidence_threshold: null  # tuned on pilot recordings only, never on evaluation rooms
+
+reconstruction:
+  method: vggt            # fallback: colmap
+
+topview: {}
+
+seats:
+  use_context_indicators: true  # chairs/screens as seat cues; switch off for H3
+
+layout: {}
+
+export: {}

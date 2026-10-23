@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "seatmap-gen"
+version = "0.1.0"
+description = "Semi-automated generation of 2D office seat maps from camera recordings using AI"
+readme = "README.md"
+requires-python = ">=3.11"
+# Light stages (frames, top view, seats, layout, export); also run on the laptop without CUDA.
+dependencies = [
+    "numpy",
+    "opencv-python",
+    "open3d",
+    "shapely",
+    "scikit-learn",
+    "svgwrite",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# GPU stages (detection, reconstruction). Install PyTorch with CUDA 12.8+ first
+# (https://download.pytorch.org/whl/cu128) and VGGT from its official repository.
+gpu = ["ultralytics"]
+colmap = ["pycolmap"]
+dev = ["pytest", "ruff", "mypy", "pre-commit", "types-PyYAML"]
+
+[project.scripts]
+seatmap = "seatmap.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/seatmap"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "C4",  # flake8-comprehensions
+    "N",   # pep8-naming
+    "RUF", # ruff-specific rules
+]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "src"
+strict = true
+warn_unreachable = true
+pretty = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
