@@ -2,7 +2,7 @@
 
 **Project:** Semi-automated generation of 2D office seat maps from camera recordings using AI
 **Context:** Bachelor thesis, Silas Bräunlich, Provadis Hochschule (BBIM23)
-**Status:** 23 Oct 2026 · v0.2 (work in progress)
+**Status:** 26 Oct 2026 · v0.3 (work in progress)
 
 Status labels used in this document: **Decided** · **Proposed** (not yet confirmed) · **Open**
 
@@ -11,7 +11,8 @@ Status labels used in this document: **Decided** · **Proposed** (not yet confir
 ## 1. Purpose
 
 The prototype takes an ordinary smartphone video of **a single office room** and produces a
-schematic **SVG seat map** for the booking tool BeSeated.
+schematic seat map for the booking tool BeSeated: a **map file in the BeSeated map format**
+(JSON with one record per room and desk, see 5.5) plus an SVG preview.
 
 The map contains one room rectangle and one equally sized rectangle per bookable seat.
 What matters:
@@ -29,7 +30,7 @@ desk bench into several seats.
 
 ```
 [1] Record  →  [2] Run tool in terminal  →  [3] Automatic processing
-      →  [4] SVG file  →  [5] Import + correct in BeSeated editor  →  [6] Use
+      →  [4] JSON file  →  [5] Import + correct in BeSeated editor  →  [6] Use
 ```
 
 1. **Record:** A person films one office room with a smartphone, following a short recording
@@ -38,8 +39,8 @@ desk bench into several seats.
 2. **Run:** The video is passed to the tool via a terminal command, together with the room name
    (e.g. `4.02`).
 3. **Process:** The pipeline runs without user interaction (see section 5).
-4. **Result:** One SVG file for the room in BeSeated style.
-5. **Correct:** The SVG is imported into BeSeated; missing, wrong or misplaced seats are fixed in
+4. **Result:** One JSON file with the room's BeSeated entities, plus an SVG preview.
+5. **Correct:** The JSON is imported into the BeSeated backend (separate step); missing, wrong or misplaced seats are fixed in
    the existing BeSeated editor (human in the loop).
 6. **Use:** The map is released and seats become bookable.
 
@@ -51,8 +52,8 @@ editor; steps 1–4 are skipped.
 | Topic | Decision | Status |
 |---|---|---|
 | Input | One video = one room | Decided |
-| Output | One SVG file per room; no integration into a full floor map | Decided |
-| Storage in BeSeated | Later via database with coordinates; not part of the first step | Decided |
+| Output | One map file per room in the BeSeated map format (section 5.5); SVG only as preview; no integration into a full floor map | Decided |
+| Storage in BeSeated | The map file is imported into the backend in a separate step; the tool never writes to the BeSeated database | Decided |
 | User interface | Terminal (CLI) only, no custom UI | Decided |
 | Human in the loop | Existing BeSeated editor; no custom editor | Decided |
 | Flagging uncertain results to the user | Out of scope | Decided |
@@ -121,7 +122,7 @@ Code is kept in sync between both machines via Git. Data and run outputs are not
 | 4 | Top view | Outputs of 2 + 3 | Each furniture item exactly once as a 2D footprint; floor points of the room | Open3D, NumPy, shapely, scikit-learn |
 | 5 | Seat derivation | Top-view objects | Seats with position and orientation; context indicators switchable (H3) | NumPy, shapely |
 | 6 | Layout normalization | Seats + floor points | Room rectangle; equally sized seat rectangles on a grid with block, row, column | NumPy, scikit-learn |
-| 7 | SVG export | Normalized layout | SVG file in BeSeated format | svgwrite |
+| 7 | Export | Normalized layout | JSON with BeSeated entity records; SVG preview | Pydantic, svgwrite |
 
 Stages 2 and 3 are independent of each other.
 
@@ -139,7 +140,8 @@ runs/4.02_2026-11-20_1430/
   04_topview/
   05_seats/
   06_layout/
-  07_export/room_4.02.svg
+  07_export/room_4.02.json
+  07_export/room_4.02.svg      (preview)
 ```
 
 ### 5.4 Stage 1 – Frame Extraction (Proposed)
@@ -163,6 +165,66 @@ Configurable: sampling rate, sharpness threshold, number of keyframes, target wi
 
 Stages 2–7 will be detailed step by step.
 
+### 5.5 BeSeated Map Format (target of stages 6 + 7)
+
+The output format is defined by the BeSeated backend in
+[`beseated-map-format.md`](beseated-map-format.md) (file format, field rules, JSON Schema,
+geometric conventions). The file is imported into the backend; importing is a separate step
+outside the tool.
+
+**Key facts:**
+
+- A BeSeated map is **not** an SVG. It is a list of `FloorDistribution` records per floor
+  (rooms, desks, …), each an axis-aligned rectangle.
+- Desks are not linked to rooms; a desk belongs to a room only because it lies inside the room's
+  rectangle and is drawn on a higher layer (`z`).
+- Coordinates: origin top-left, y downwards, `x`/`y` = top-left corner, integers ≥ 0.
+
+**What the tool produces (Decided):** one map file per room,
+`07_export/room_<room name>.json`: a `floor` object plus `distributions` with one `ROOM` and one
+`TABLE` per bookable seat. The fields that carry the result are `name`, `shape`, `type`, `x`,
+`y`, `width`, `height`; all other required fields get the convention values below so the file is
+schema-valid, and are adjusted later in the app if needed.
+
+| Field | `ROOM` | `TABLE` |
+|---|---|---|
+| `name` | Room name from the CLI | `<room name>-T<n>`, n = table number (e.g. `FFM-4OG-4.01-T8`) |
+| `shape` | `Viereck` | `Viereck` |
+| `x`, `y` | `0`, `0` | Top-left corner, inside the room |
+| `width` × `height` | From the layout | `40 × 20` or `20 × 40` |
+| `z` | `0` | `2` |
+| `reservable`, `requestable`, `locked` | `false`, `false`, `false` | `true`, `true`, `false` |
+| `owner`, `notification`, `icons` | `null`, `null`, `[]` | `null`, `null`, `[]` |
+
+The `floor` object (`locationId`, `name`, `number`, `main`, `type`) is unknown to the tool and
+comes from the `export` section of the config (placeholders for the experiment, Proposed).
+Naming is low priority for the experiment; for later use on whole floors, the tool asks for a
+floor name and uses it as the prefix instead of the room name.
+
+**Consequences for the pipeline (Proposed):**
+
+- **Stage 6 – axis alignment:** the room is rotated so its main axis lines up with x/y. A seat's
+  orientation is expressed only by choosing `40 × 20` or `20 × 40`.
+- **Stage 6 – scale:** units have no fixed meaning, but BeSeated draws text and icons at fixed
+  sizes in map units, so the map must use the scale of existing maps: one desk = 40 × 20 units
+  (roughly 25 units per metre for a 1.6 m desk), rooms about 115–121 wide. Values are rounded
+  to integers.
+- **Stage 6 – geometry rules:** every `TABLE` lies completely inside the `ROOM`, desks do not
+  overlap (touching edges are allowed), and a strip of about 15 units at the top of the room is
+  kept free for the room name.
+- **Name length:** element names ≤ 30 characters, so the room name may be at most 26 characters
+  (`-T` plus two digits); the CLI rejects longer names.
+- **Stage 7 – validation:** the file is checked against the JSON Schema and the geometric
+  conventions (format document, sections 6–8) before it is written.
+- **Evaluation:** reference maps of the manual baseline are fetched in the same format via
+  `GET /BeSeated/api/locations/{locationId}/floors/{floorId}/floor-distributions`, so the
+  evaluation compares like with like.
+
+**SVG preview (stage 7, debugging and thesis figures only):** drawn from the same records the
+way BeSeated draws them: the `viewBox` is the bounding box of all elements, one `<rect>` per
+element painted in ascending `z` (room below desks), the room name as text at (5, 12) inside
+the room, and the tool's own seat numbers on the desks.
+
 ## 6. Tech Stack
 
 | Area | Library / Tool | Used in | Status |
@@ -176,7 +238,7 @@ Stages 2–7 will be detailed step by step.
 | Numerics | NumPy | all | Decided |
 | 2D geometry | shapely | 4, 5, 6 | Decided |
 | Clustering (deduplication, rows/columns) | scikit-learn | 4, 6 | Decided |
-| SVG output | svgwrite | 7 | Decided |
+| SVG preview | svgwrite | 7 | Decided |
 | Data schemas | Pydantic | all | Proposed |
 | Config | PyYAML | all | Proposed |
 | CLI | Typer | all | Proposed |
@@ -193,7 +255,8 @@ any productive use.
 
 | Item | Clarify with | Why it matters |
 |---|---|---|
-| Structure of the BeSeated SVG (elements, IDs/attributes, units, sizes) | BeSeated | Determines whether the generated file can be imported directly |
+| Import of the map file into the BeSeated backend (who builds it, when) | BeSeated | Without it the map cannot be corrected in the editor, so H1/H3 cannot be measured |
+| `floor` values for the test rooms (`locationId`, floor name and number) | BeSeated | Needed for a schema-valid file; placeholders until then |
 | Measuring editing time and corrections in the BeSeated editor (logs available? otherwise stopwatch / screen recording) | BeSeated | Measurement data for H1 and H3 |
 | Access to the three test rooms | BeSeated / office | Required for the spike and the evaluation |
 | GPU workstation setup (driver, CUDA 12.8+, WSL2) | self | RTX 50 series only works with current versions |

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Bachelor thesis prototype: semi-automated generation of 2D office seat maps (SVG for BeSeated)
+Bachelor thesis prototype: semi-automated generation of 2D office seat maps (BeSeated entity JSON + SVG preview)
 from smartphone videos of a single office room.
 
 The full technical setup (purpose, workflow, key decisions, hardware, pipeline stages, tech

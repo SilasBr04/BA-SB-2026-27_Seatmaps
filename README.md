@@ -5,8 +5,8 @@ Semi-automated generation of 2D office seat maps from camera recordings using AI
 ## Purpose
 
 This project is part of a bachelor thesis. A smartphone video of **one office room** is turned
-into a schematic **SVG seat map** for the booking tool BeSeated, where it is corrected in the
-existing editor. Full technical description: [`docs/technical-setup.md`](docs/technical-setup.md).
+into a schematic seat map for the booking tool BeSeated (a JSON file with BeSeated entity
+records plus an SVG preview), where it is corrected in the existing editor. Full technical description: [`docs/technical-setup.md`](docs/technical-setup.md).
 
 Pipeline (one module and one CLI command per stage, each re-runnable on its own):
 
@@ -18,7 +18,7 @@ Pipeline (one module and one CLI command per stage, each re-runnable on its own)
 | 4 | Top view | `seatmap.topview` | `04_topview/` |
 | 5 | Seat derivation | `seatmap.seats` | `05_seats/` |
 | 6 | Layout normalization | `seatmap.layout` | `06_layout/` |
-| 7 | SVG export | `seatmap.export` | `07_export/` |
+| 7 | Export | `seatmap.export` | `07_export/` |
 
 Evaluation against reference maps (`seatmap.evaluation`) runs outside the pipeline.
 
