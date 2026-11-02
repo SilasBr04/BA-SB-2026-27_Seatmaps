@@ -176,6 +176,12 @@ Configurable: sampling rate, sharpness threshold, number of keyframes, target wi
 - Short videos get fewer keyframes: at most one per `min_keyframe_interval_s` (1.5 s), capped at
   `num_keyframes` (40). The cutoff follows from both values: 40 x 1.5 s = 60 s; longer videos
   always get 40 windows, a 28 s video gets 18.
+- Adjacent keyframes are at least `min_keyframe_gap_s` (0.75 s) apart; otherwise the sharpest
+  frames of two neighbouring windows can sit at their shared border and show the same view.
+  A window whose kept frames are all too close to the previous keyframe stays empty.
+
+How stage 1 was developed and why: [`development/01-frames.md`](development/01-frames.md).
+Recording rules for the person filming: [`recording-guide.md`](recording-guide.md) (draft).
 
 Stages 2–7 will be detailed step by step.
 

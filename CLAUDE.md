@@ -8,6 +8,20 @@ stack, open points) lives in `docs/technical-setup.md` and is imported below. Re
 status labels there: only **Decided** items are fixed; **Proposed** and **Open** items need
 confirmation before being treated as settled. Keep that file updated when decisions change.
 
+## Documentation
+
+This is a thesis project, so the way it was built is documented, not only the result:
+
+- `docs/technical-setup.md` — current state (what the system does). Update it when a decision
+  changes.
+- `docs/development/<NN>-<stage>.md` (`00-project.md` for cross-cutting topics) — development
+  record: timeline, decisions with reasons and status, pilot runs with numbers and findings,
+  rejected alternatives. Whenever something is decided, implemented or changed after a test,
+  add it there in the same change. Record only reasons that were actually given or observed;
+  ask if the reason is unknown.
+- `docs/todo.md` — tick off items when done; add new ones that come up.
+- `docs/recording-guide.md` — rules for the person filming; update with findings from pilot runs.
+
 ## Code structure
 
 - `src/seatmap/<stage>/stage.py` — one package per stage with entry point `execute(run: Run)`.

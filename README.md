@@ -31,7 +31,8 @@ data/
   raw/evaluation/   Recordings of the evaluation rooms           — never committed
   annotations/      Annotations for fine-tuning
   reference/        Reference seat maps for evaluation
-docs/               Technical setup
+docs/               Technical setup, recording guide, BeSeated map format
+  development/      Development record per stage: decisions and why
 runs/               One folder per run: runs/<room>_<YYYY-MM-DD_HHMM>/
 notebooks/          Exploratory Jupyter notebooks
 src/seatmap/        Python package

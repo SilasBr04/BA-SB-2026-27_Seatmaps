@@ -5,8 +5,8 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 
 ## 0. Setup
 
-- [ ] Commit the current doc changes (`technical-setup.md`, `beseated-map-format.md`, this file)
-- [ ] Laptop: install dev dependencies (`uv pip install -e ".[dev]"`), check `make test` runs
+- [x] Commit the current doc changes (`technical-setup.md`, `beseated-map-format.md`, this file)
+- [x] Laptop: install dev dependencies (`uv pip install -e ".[dev]"`), check `make test` runs
 - [ ] GPU workstation: driver, WSL2 + Ubuntu, Python 3.11, uv, clone repo (section 4.3)
 - [ ] GPU workstation: PyTorch with CUDA 12.8+, verify the GPU with the check in step 6 of section 4.3
 - [ ] GPU workstation: install VGGT and COLMAP / pycolmap
@@ -14,12 +14,14 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 ## 1. Frame extraction — implemented, needs a pilot video to tune
 
 - [x] Stage implemented (`python -m seatmap frames <run_dir>`), tested on a synthetic video
-- [ ] Run it on the pilot video and check `01_frames/debug/` (contact sheet, sharpness plot)
+- [x] Run it on the pilot video and check `01_frames/debug/` (contact sheet, sharpness plot)
+- [x] Add a minimum gap between adjacent keyframes (pilot run showed near-duplicates)
 - [ ] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5,
-      minimum keyframe interval 1.5 s
-- [ ] Write a short recording guide (walk slowly, every desk in view, no persons, landscape or
-      portrait, phone resolution/fps)
-- [ ] Record 1–2 pilot videos of a room that is **not** an evaluation room; put them in
+      minimum keyframe interval 1.5 s, minimum keyframe gap 0.75 s
+- [x] Write a short recording guide: draft in `recording-guide.md`
+- [ ] Review the recording guide; decide portrait vs. landscape after the stage 2/3 spike
+- [ ] Record a pilot video of a real office room (several desks), following the guide
+- [x] Record 1–2 pilot videos of a room that is **not** an evaluation room; put them in
       `data/raw/pilot/`
 
 ## 2. Detection + tracking — needs the pilot video

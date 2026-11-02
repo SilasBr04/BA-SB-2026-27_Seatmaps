@@ -16,6 +16,9 @@ Steps (docs/technical-setup.md, section 5.4):
    kept frame of each window becomes a keyframe. Windows without kept frames stay empty.
    Number of windows: `num_keyframes`, but at most one per `min_keyframe_interval_s`, so short
    videos get fewer keyframes (cutoff at num_keyframes x interval, e.g. 40 x 1.5 s = 60 s).
+   Adjacent keyframes must be at least `min_keyframe_gap_s` apart: the sharpest frame of two
+   neighbouring windows can otherwise sit right at their shared border and show the same view.
+   A window whose kept frames are all too close to the previous keyframe stays empty.
 """
 
 from __future__ import annotations
@@ -46,6 +49,7 @@ class Settings:
     num_keyframes: int
     min_sharpness_ratio: float
     min_keyframe_interval_s: float
+    min_keyframe_gap_s: float
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> Settings:
@@ -59,11 +63,17 @@ class Settings:
             num_keyframes=int(config["num_keyframes"]),
             min_sharpness_ratio=float(config["min_sharpness_ratio"]),
             min_keyframe_interval_s=float(config["min_keyframe_interval_s"]),
+            min_keyframe_gap_s=float(config["min_keyframe_gap_s"]),
         )
         if settings.sample_fps <= 0 or settings.target_width <= 0 or settings.num_keyframes <= 0:
             raise UserError("frames: sample_fps, target_width and num_keyframes must be > 0")
         if settings.min_keyframe_interval_s <= 0:
             raise UserError("frames: min_keyframe_interval_s must be > 0")
+        # windows are at least min_keyframe_interval_s wide, so a smaller gap always leaves room
+        if not 0 <= settings.min_keyframe_gap_s < settings.min_keyframe_interval_s:
+            raise UserError(
+                "frames: min_keyframe_gap_s must be >= 0 and below min_keyframe_interval_s"
+            )
         if not 0 <= settings.min_sharpness_ratio <= 1:  # <= 1 keeps at least the sharpest frame
             raise UserError("frames: min_sharpness_ratio must be between 0 and 1")
         return settings
@@ -103,7 +113,7 @@ def execute(run: Run) -> None:
     video, frames = sample_frames(run.video, settings, frames_dir)
     threshold = drop_blurry(frames, settings.min_sharpness_ratio, out_dir)
     span = frames[-1].timestamp_s - frames[0].timestamp_s
-    windows = select_keyframes(frames, keyframe_count(span, settings))
+    windows = select_keyframes(frames, keyframe_count(span, settings), settings.min_keyframe_gap_s)
 
     kept = [f for f in frames if f.kept]
     keyframes = [f for f in frames if f.keyframe]
@@ -232,10 +242,13 @@ def keyframe_count(span_s: float, settings: Settings) -> int:
     return max(1, min(settings.num_keyframes, by_length))
 
 
-def select_keyframes(frames: list[Frame], num_keyframes: int) -> list[Frame | None]:
-    """Split the sampled time span into equal windows and flag the sharpest kept frame of each.
+def select_keyframes(
+    frames: list[Frame], num_keyframes: int, min_gap_s: float = 0.0
+) -> list[Frame | None]:
+    """Split the sampled time span into equal windows and flag the sharpest kept frame of each
+    that is at least `min_gap_s` after the previous keyframe.
 
-    Returns one entry per window (None for windows without kept frames).
+    Returns one entry per window (None for windows without a suitable kept frame).
     """
     start, end = frames[0].timestamp_s, frames[-1].timestamp_s
     width = (end - start) / num_keyframes
@@ -247,10 +260,17 @@ def select_keyframes(frames: list[Frame], num_keyframes: int) -> list[Frame | No
         windows[min(slot, num_keyframes - 1)].append(frame)
 
     chosen: list[Frame | None] = []
+    previous: Frame | None = None
     for window in windows:
-        best = max(window, key=lambda f: f.sharpness, default=None)
+        candidates = [
+            f
+            for f in window
+            if previous is None or f.timestamp_s - previous.timestamp_s >= min_gap_s - 1e-6
+        ]
+        best = max(candidates, key=lambda f: f.sharpness, default=None)
         if best is not None:
             best.keyframe = True
+            previous = best
         chosen.append(best)
     return chosen
 
