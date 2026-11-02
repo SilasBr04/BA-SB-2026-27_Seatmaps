@@ -63,15 +63,26 @@ uv pip install -e ".[gpu,dev]"
 
 ## Usage
 
+Whole pipeline:
+
 ```bash
-seatmap run data/raw/pilot/room.mp4 --room 4.02          # new run, all stages
-seatmap init data/raw/pilot/room.mp4 --room 4.02         # new run folder only
-seatmap detection runs/4.02_2026-11-20_1430              # (re-)run a single stage
-seatmap resume runs/4.02_2026-11-20_1430 --from topview  # re-run from a stage onwards
-seatmap evaluate runs/4.02_2026-11-20_1430 data/reference/4.02.svg
+seatmap run data/raw/pilot/room.mp4 --room 4.02                  # new run, all stages
+seatmap run data/raw/pilot/room.mp4 --room 4.02 --until frames   # new run, stop after a stage
 ```
 
-Add `--config configs/<experiment>.yaml` to `run`/`init` to override defaults.
+Single stages, on the latest run (or pass a run folder, e.g. `runs/4.02_2026-11-20_1430`):
+
+```bash
+seatmap init data/raw/pilot/room.mp4 --room 4.02   # new run folder only, no stage
+seatmap frames                                     # (re-)run one stage
+seatmap resume --from topview                      # re-run from a stage onwards
+seatmap resume --from detection --until topview    # re-run a range of stages
+seatmap evaluate data/reference/4.02.json          # compare with a reference map
+```
+
+`run` stops with a message at the first stage that is not implemented yet. Add
+`--config configs/<experiment>.yaml` to `run`/`init` to override defaults. Without activating
+the virtual environment, use `python -m seatmap` instead of `seatmap`.
 
 ## Privacy
 

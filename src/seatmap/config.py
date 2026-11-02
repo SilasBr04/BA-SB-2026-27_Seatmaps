@@ -7,13 +7,17 @@ from typing import Any
 
 import yaml
 
+from seatmap.errors import UserError
+
 DEFAULT_CONFIG = Path("configs/default.yaml")
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        raise UserError(f"config file not found: {path}")
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(data, dict):
-        raise ValueError(f"{path}: top level must be a mapping")
+        raise UserError(f"{path}: top level must be a mapping")
     return data
 
 

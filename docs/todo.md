@@ -11,9 +11,12 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 - [ ] GPU workstation: PyTorch with CUDA 12.8+, verify the GPU with the check in step 6 of section 4.3
 - [ ] GPU workstation: install VGGT and COLMAP / pycolmap
 
-## 1. Frame extraction — can start now
+## 1. Frame extraction — implemented, needs a pilot video to tune
 
-- [ ] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5
+- [x] Stage implemented (`python -m seatmap frames <run_dir>`), tested on a synthetic video
+- [ ] Run it on the pilot video and check `01_frames/debug/` (contact sheet, sharpness plot)
+- [ ] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5,
+      minimum keyframe interval 1.5 s
 - [ ] Write a short recording guide (walk slowly, every desk in view, no persons, landscape or
       portrait, phone resolution/fps)
 - [ ] Record 1–2 pilot videos of a room that is **not** an evaluation room; put them in

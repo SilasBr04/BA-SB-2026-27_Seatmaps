@@ -163,6 +163,20 @@ Output in `01_frames/`: `frames/*.jpg`, `frames.json` (frame number, timestamp, 
 keyframe flag, video metadata), a keyframe contact sheet and a sharpness-over-time plot.
 Configurable: sampling rate, sharpness threshold, number of keyframes, target width.
 
+**Implemented** (start values still Proposed):
+
+- OpenCV applies the rotation metadata while decoding; frames are stored upright and the angle
+  is only recorded. Timestamps come from the video's presentation times (variable frame rate).
+- Frames are only downscaled, never upscaled (a 1080 px portrait video keeps its width).
+- Sharpness is computed on the resized grayscale frame, so values are comparable between videos
+  of different resolution.
+- Dropped frames stay in `frames.json` (`kept: false`, no file) for analysis.
+- Keyframes are chosen from kept frames only; a window without kept frames stays empty, so a
+  video can yield fewer than `num_keyframes` keyframes (counted in the `frames.json` summary).
+- Short videos get fewer keyframes: at most one per `min_keyframe_interval_s` (1.5 s), capped at
+  `num_keyframes` (40). The cutoff follows from both values: 40 x 1.5 s = 60 s; longer videos
+  always get 40 windows, a 28 s video gets 18.
+
 Stages 2–7 will be detailed step by step.
 
 ### 5.5 BeSeated Map Format (target of stages 6 + 7)
