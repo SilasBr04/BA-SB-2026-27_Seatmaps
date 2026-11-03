@@ -2,7 +2,7 @@
 
 **Project:** Semi-automated generation of 2D office seat maps from camera recordings using AI
 **Context:** Bachelor thesis, Silas Bräunlich, Provadis Hochschule (BBIM23)
-**Status:** 26 Oct 2026 · v0.3 (work in progress)
+**Status:** 3 Nov 2026 · v0.3 (work in progress)
 
 Status labels used in this document: **Decided** · **Proposed** (not yet confirmed) · **Open**
 
@@ -71,7 +71,7 @@ editor; steps 1–4 are skipped.
 
 | Machine | Specs | Role |
 |---|---|---|
-| GPU workstation | NVIDIA RTX 5070 (12 GB VRAM), strong CPU, 32 GB DDR5 RAM | Runs the full pipeline, model training, evaluation |
+| GPU workstation | NVIDIA GeForce RTX 5060 Ti (16 GB VRAM, Blackwell), AMD Ryzen 7 7800X3D (8 cores), 32 GB DDR5-4800 RAM, Windows 11 Pro | Runs the full pipeline, model training, evaluation |
 | Laptop | AMD Ryzen 5 5500U, integrated Radeon graphics (no CUDA), 16 GB RAM | Optional: coding, light stages (frame extraction, layout, SVG) |
 
 Code is kept in sync between both machines via Git. Data and run outputs are not committed.
@@ -80,8 +80,8 @@ Code is kept in sync between both machines via Git. Data and run outputs are not
 
 | Component | Choice | Notes |
 |---|---|---|
-| OS | Windows + **WSL2 with Ubuntu** | VGGT and COLMAP are much easier to install on Linux; CUDA works inside WSL2 |
-| GPU driver | Current NVIDIA driver (installed on Windows) | Required for RTX 50 series (Blackwell) |
+| OS | Windows 11 Pro + **WSL2 with Ubuntu** | VGGT and COLMAP are much easier to install on Linux; CUDA works inside WSL2 |
+| GPU driver | Current NVIDIA driver (installed on Windows; 621.01 as of 3 Nov 2026) | Required for RTX 50 series (Blackwell); WSL2 uses the Windows driver, no driver inside Ubuntu |
 | CUDA / PyTorch | PyTorch build with **CUDA 12.8 or newer** | Older builds do not support the RTX 50 series |
 | Python | 3.11 | |
 | Package management | uv (or pip + venv) | |
@@ -147,7 +147,8 @@ runs/4.02_2026-11-20_1430/
 ### 5.4 Stage 1 – Frame Extraction (Proposed)
 
 Two consumers with different needs: detection benefits from many frames; VGGT can only process
-roughly 40–50 frames at once with 12 GB VRAM. Stage 1 therefore outputs all usable frames plus a
+a limited number of frames at once (estimated 40–50 with 12 GB VRAM; the workstation has 16 GB,
+the actual limit is measured in the stage 3 spike). Stage 1 therefore outputs all usable frames plus a
 smaller keyframe subset.
 
 1. **Read video:** frame rate, resolution, duration and rotation metadata (smartphones often

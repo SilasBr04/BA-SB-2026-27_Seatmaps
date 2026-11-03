@@ -10,7 +10,9 @@ Two later stages consume frames, with different needs:
 
 - **Detection (stage 2)** benefits from many frames, so every desk is seen several times and
   tracking works.
-- **VGGT (stage 3)** can process only about 40–50 frames at once with 12 GB VRAM.
+- **VGGT (stage 3)** can process only a limited number of frames at once. Originally estimated
+  at about 40–50 frames for 12 GB VRAM; the 12 GB was wrong information, the workstation has
+  16 GB (corrected 3 Nov, see below).
 
 Smartphone videos also bring practical problems: rotation stored only as metadata, variable
 frame rate, motion blur during turns, and different resolutions per phone.
@@ -26,6 +28,7 @@ for VGGT.
 | 2 Nov 2026 | Stage 1 implemented, tested on a synthetic video | `ff2d1b9` |
 | 2 Nov 2026 | First pilot video (home room, 28 s, portrait): run `test_2026-11-02_1144` | — |
 | 2 Nov 2026 | Minimum gap between adjacent keyframes added; re-run `test_2026-11-02_1153`; recording guide drafted | — |
+| 3 Nov 2026 | VRAM figure corrected: workstation has 16 GB, not 12 GB; basis of decision 10 marked as wrong | — |
 
 ## Decisions
 
@@ -40,7 +43,7 @@ for VGGT.
 | 7 | Drop frames below 0.5 × the video's mean sharpness | A relative threshold adapts to each video's lighting and texture; an absolute value would have to be tuned per room | Proposed |
 | 8 | Keep dropped frames in `frames.json` (`kept: false`, no image file) | Allows analysing how much was dropped and where | Implemented |
 | 9 | Keyframes: split the video into equal time windows, take the sharpest kept frame of each | Spreads keyframes over the whole walk (all parts of the room) while preferring sharp frames | Proposed |
-| 10 | 40 keyframes | Upper end that fits VGGT on 12 GB VRAM; to be checked in the stage 3 spike | Proposed |
+| 10 | 40 keyframes | Chosen as the upper end that fits VGGT on 12 GB VRAM. The 12 GB was wrong information (workstation has 16 GB, corrected 3 Nov, see [`00-project.md`](00-project.md)); 40 is kept as a safe start value, the actual limit and whether more keyframes help is checked in the stage 3 spike | Proposed |
 | 11 | At most one keyframe per 1.5 s (`min_keyframe_interval_s`) | Short videos would otherwise get very narrow windows and many near-identical keyframes. 40 × 1.5 s = 60 s is the cutoff; this also gives the minimum video length in the recording guide | Proposed |
 | 12 | A window without a kept frame stays empty | Taking a blurry frame would give VGGT a poor image; fewer keyframes are better than bad ones. Counted in the `frames.json` summary | Implemented |
 | 13 | Adjacent keyframes at least 0.75 s apart (`min_keyframe_gap_s`); a window whose kept frames are all too close stays empty | Found in the pilot run (see below) | Proposed |

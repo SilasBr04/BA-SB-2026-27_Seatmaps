@@ -11,6 +11,7 @@ where they were written down; "—" means the reason still has to be recorded.
 | 23 Oct 2026 | Project start: technical setup v0.2, repository skeleton (one package per stage, run folders, CLI) | `5167f51` |
 | 26 Oct 2026 | Technical setup v0.3: output changed from SVG to the BeSeated map format (JSON) | `ff1c0ea` |
 | 2 Nov 2026 | Stage 1 implemented ([`01-frames.md`](01-frames.md)) | `ff2d1b9` |
+| 3 Nov 2026 | Hardware specs corrected: the GPU workstation has an RTX 5060 Ti with 16 GB; the earlier "RTX 5070, 12 GB" was wrong information | — |
 
 ## Scope and workflow
 
@@ -64,6 +65,20 @@ The exposé still describes blurring; it has to be updated (`todo.md`).
 | PyTorch with CUDA 12.8 or newer | Older builds do not support the RTX 50 series | Decided |
 | Confidence threshold for detections, tuned on pilot recordings only, never on evaluation rooms | — | Decided |
 | Fixed file formats per stage (JSON, JPG, `.npy`, PLY), one module and CLI command per stage, debug output per stage, frozen `config.yaml` per run | Every stage can be re-run on its own; runs are reproducible; debug images help troubleshooting and serve as thesis figures | Decided |
+
+**GPU workstation specs corrected (3 Nov):** up to v0.3 the setup listed the GPU workstation as
+an RTX 5070 with 12 GB VRAM. **That was wrong information, not a hardware change:** the machine
+was never a 12 GB machine. Checked on the machine itself (`nvidia-smi`, system info): NVIDIA
+GeForce RTX 5060 Ti with 16 GB VRAM (Blackwell, driver 621.01), AMD Ryzen 7 7800X3D, 32 GB
+DDR5-4800, Windows 11 Pro.
+
+Consequences:
+
+- Still RTX 50 series, so the CUDA 12.8+ requirement is unchanged.
+- Everything sized for 12 GB was based on the wrong value. In particular the VGGT estimate of
+  40–50 frames at once, and with it the choice of 40 keyframes in stage 1
+  ([`01-frames.md`](01-frames.md), decision 10). With 16 GB more keyframes may fit; the actual
+  limit is measured in the stage 3 spike.
 
 **Licensing note:** Ultralytics YOLO is AGPL-3.0 (fine for the thesis, commercial use in
 BeSeated would need an Enterprise license). VGGT and SAM 3 licenses still to be checked.

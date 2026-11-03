@@ -34,7 +34,7 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 
 ## 3. Camera motion + depth — needs the pilot video and the workstation
 
-- [ ] Run VGGT on the 40 pilot keyframes; check that it fits into 12 GB and the poses look plausible
+- [ ] Run VGGT on the 40 pilot keyframes; check that it fits into 16 GB VRAM (and whether more keyframes fit) and the poses look plausible
 - [ ] Check the VGGT license
 - [ ] Decide whether the COLMAP fallback is needed
 
