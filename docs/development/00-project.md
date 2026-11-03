@@ -101,5 +101,16 @@ Consequences:
 | Room names must not start or end with whitespace or contain control characters | `--room " 4.02"` was accepted, so the folder name and later the BeSeated element names (` 4.02-T1`) would not match the reference map | Implemented |
 | `seatmap evaluate <reference> [run_dir]` keeps the new argument order | The review flagged that the order changed against `main`. Kept: an optional positional (`run_dir`, default latest run) must come last, the README already shows this order, and evaluation is not implemented yet, so no existing calls break | Proposed |
 
+## Windows setup without uv (3 Nov)
+
+Observed on the GPU workstation (Windows, PowerShell): `seatmap` was not found. PyCharm had
+created `.venv` on Python 3.14 (the only installed version) without installing the project, so
+it held only pip. Fix: install Python 3.11, recreate `.venv` with `py -3.11 -m venv`, then
+`pip install -e ".[dev]"`; 56 tests pass.
+
+| Decision | Why | Status |
+|---|---|---|
+| README setup also covers Windows PowerShell without uv (venv via `py -3.11`, `Activate.ps1`, execution policy), the PyCharm interpreter choice, and the direct commands behind the `make` targets | uv was not installed and the README only showed uv; `make` does not exist on Windows; the `.venv\Scripts\activate` hint does not work in PowerShell; PyCharm's own venv caused the problem | Implemented |
+
 **Licensing note:** Ultralytics YOLO is AGPL-3.0 (fine for the thesis, commercial use in
 BeSeated would need an Enterprise license). VGGT and SAM 3 licenses still to be checked.

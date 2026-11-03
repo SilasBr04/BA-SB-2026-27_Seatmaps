@@ -49,9 +49,15 @@ tests/              Test suite
 Requires Python 3.11. The full pipeline runs on the GPU workstation in WSL2 (Ubuntu); the light
 stages also run on a machine without CUDA. See `docs/technical-setup.md`, section 4.
 
+The virtual environment `.venv` is not committed; create it once per machine. Installing the
+project (`-e`) puts the `seatmap` command into the venv, so it is only available while the venv
+is active.
+
+**Linux / WSL2 (with [uv](https://docs.astral.sh/uv/)):**
+
 ```bash
 uv venv --python 3.11
-source .venv/bin/activate                      # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 uv pip install -e ".[dev]"                     # light stages + dev tools
 
 # GPU workstation only:
@@ -60,7 +66,32 @@ uv pip install -e ".[gpu,dev]"
 # VGGT: install from its official repository; COLMAP fallback: uv pip install -e ".[colmap]"
 ```
 
-`make install`, `make test`, `make lint` and `make format` are available as well.
+**Windows (PowerShell, without uv):** install Python 3.11 first
+(`winget install --id Python.Python.3.11 -e`), then in the project folder:
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1                     # prompt shows (.venv)
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+seatmap --help                                 # check
+```
+
+If activation fails with "running scripts is disabled", run
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+
+**PyCharm:** select `.venv\Scripts\python.exe` (or `.venv/bin/python`) as the project
+interpreter (Settings → Project → Python Interpreter). Do not let PyCharm create its own venv:
+it may pick a different Python version and does not install the project.
+
+**Tests and linting:** `make test`, `make lint`, `make format` and `make install` work on
+Linux/WSL2. Windows has no `make`; run the commands directly in the active venv:
+
+```powershell
+pytest                                         # make test
+ruff check src tests; ruff format --check src tests; mypy src tests   # make lint
+ruff check --fix src tests; ruff format src tests                     # make format
+```
 
 ## Usage
 
