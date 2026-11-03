@@ -32,24 +32,26 @@ for VGGT.
 | 3 Nov 2026 | Pilot video re-run with the optimal selection: run `test_2026-11-03_1653` | — |
 | 3 Nov 2026 | Remaining code review findings fixed: settings validation, debug figures on re-run, exact threshold (see below) | — |
 | 3 Nov 2026 | VRAM figure corrected: workstation has 16 GB, not 12 GB; basis of decision 10 marked as wrong | — |
+| 3 Nov 2026 | Start values confirmed (decisions 1, 5, 7, 10, 11, 13 → Decided) | — |
+| 3 Nov 2026 | Recording guide reviewed → v0.2: no moving of furniture/screens, all walls and corners in view, no phone rotation, glass walls, stabilization; rules without observed basis marked *(unverified)*; H1 timing and screens on/off added as open points | — |
 
 ## Decisions
 
 | # | Decision | Why | Status |
 |---|---|---|---|
-| 1 | Sample at a fixed rate (3 fps) instead of using every frame | 30 fps videos have nearly identical neighbouring frames; 3 fps keeps enough overlap for tracking at a tenth of the data | Proposed |
+| 1 | Sample at a fixed rate (3 fps) instead of using every frame | 30 fps videos have nearly identical neighbouring frames; 3 fps keeps enough overlap for tracking at a tenth of the data | Decided |
 | 2 | Decode sequentially, do not seek | Seeking is unreliable for phone videos (variable frame rate, keyframe-based codecs) | Implemented |
 | 3 | Timestamps from the video's presentation times | Phones record with variable frame rate; `index / fps` drifts | Implemented |
 | 4 | Let OpenCV apply the rotation metadata, store frames upright, record the angle | Later stages need upright images; the angle stays available for analysis | Implemented |
-| 5 | Resize to 1280 px width, downscale only | Enough detail for detection, smaller files; upscaling adds no information | Proposed |
+| 5 | Resize to 1280 px width, downscale only | Enough detail for detection, smaller files; upscaling adds no information | Decided |
 | 6 | Sharpness = variance of the Laplacian on the resized grayscale frame | Standard, fast blur measure; computing it after resizing makes values comparable between videos of different resolution | Implemented |
-| 7 | Drop frames below 0.5 × the video's mean sharpness | A relative threshold adapts to each video's lighting and texture; an absolute value would have to be tuned per room | Proposed |
+| 7 | Drop frames below 0.5 × the video's mean sharpness | A relative threshold adapts to each video's lighting and texture; an absolute value would have to be tuned per room | Decided |
 | 8 | Keep dropped frames in `frames.json` (`kept: false`, no image file) | Allows analysing how much was dropped and where | Implemented |
 | 9 | Keyframes: split the video into equal time windows, take the sharpest kept frame of each | Spreads keyframes over the whole walk (all parts of the room) while preferring sharp frames | Proposed |
-| 10 | 40 keyframes | Chosen as the upper end that fits VGGT on 12 GB VRAM. The 12 GB was wrong information (workstation has 16 GB, corrected 3 Nov, see [`00-project.md`](00-project.md)); 40 is kept as a safe start value, the actual limit and whether more keyframes help is checked in the stage 3 spike | Proposed |
-| 11 | At most one keyframe per 1.5 s (`min_keyframe_interval_s`) | Short videos would otherwise get very narrow windows and many near-identical keyframes. 40 × 1.5 s = 60 s is the cutoff; this also gives the minimum video length in the recording guide | Proposed |
+| 10 | 40 keyframes | Chosen as the upper end that fits VGGT on 12 GB VRAM. The 12 GB was wrong information (workstation has 16 GB, corrected 3 Nov, see [`00-project.md`](00-project.md)); 40 is kept as a safe start value, the actual limit and whether more keyframes help is checked in the stage 3 spike | Decided (start value) |
+| 11 | At most one keyframe per 1.5 s (`min_keyframe_interval_s`) | Short videos would otherwise get very narrow windows and many near-identical keyframes. 40 × 1.5 s = 60 s is the cutoff; this also gives the minimum video length in the recording guide | Decided |
 | 12 | A window without a kept frame stays empty | Taking a blurry frame would give VGGT a poor image; fewer keyframes are better than bad ones. Counted in the `frames.json` summary | Implemented |
-| 13 | Adjacent keyframes at least 0.75 s apart (`min_keyframe_gap_s`); a window that cannot get a keyframe without breaking the gap stays empty | Found in the pilot run (see below) | Proposed |
+| 13 | Adjacent keyframes at least 0.75 s apart (`min_keyframe_gap_s`); a window that cannot get a keyframe without breaking the gap stays empty | Found in the pilot run (see below) | Decided |
 | 15 | With the gap, keyframes are chosen optimally over the whole video instead of greedily per window: first as many filled windows as possible, then the highest total sharpness | Code review, 3 Nov (see below) | Implemented |
 | 14 | Debug output: keyframe contact sheet and sharpness-over-time plot | Quick visual check per run; usable as thesis figures | Implemented |
 
@@ -153,13 +155,14 @@ Second review (3 Nov):
 | A run config without a `frames` section is reported as a user error | `run.config["frames"]` raised a `KeyError` traceback before the check meant to report a missing section could run | Implemented |
 | `select_keyframes` first clears all keyframe flags, then flags its choice; the result per window is read from the flags (no matching by `id()`) | Called twice on the same frames, flags from the first call survived, so the keyframe count and contact sheet would include stale keyframes | Implemented |
 | The contact sheet prints a warning for a keyframe file that is missing or unreadable | It was skipped silently, so the sheet could show fewer tiles than keyframes without any hint | Implemented |
-| Not changed: blurry frames are still written to disk first and deleted after the threshold is known; the contact sheet re-reads keyframes from disk | The threshold depends on the mean sharpness of all frames, so avoiding the writes would mean either keeping all encoded frames in memory or decoding the video twice. The cost (one JPEG write per dropped frame, 40 reads for the sheet) is small compared with stages 2 and 3 | Proposed |
+| Not changed: blurry frames are still written to disk first and deleted after the threshold is known; the contact sheet re-reads keyframes from disk | The threshold depends on the mean sharpness of all frames, so avoiding the writes would mean either keeping all encoded frames in memory or decoding the video twice. The cost (one JPEG write per dropped frame, 40 reads for the sheet) is small compared with stages 2 and 3. Confirmed 3 Nov | Decided |
 
 Re-running stage 1 on pilot run 3 after the first review's fixes gave the same frames and keyframes;
 only the reported threshold changed from 30.52 to 30.5218 (unrounded).
 
 ## Open
 
-- Confirm the start values (3 fps, 1280 px, 40 keyframes, ratio 0.5, interval 1.5 s, gap
-  0.75 s) with a pilot video of a real office room.
+- Start values (3 fps, 1280 px, 40 keyframes, ratio 0.5, interval 1.5 s, gap 0.75 s) were
+  confirmed on 3 Nov, before a pilot video of a real office room was available. Check them on
+  that video; a change is recorded here as a new decision.
 - Number of keyframes depends on the VGGT memory check in the stage 3 spike.

@@ -144,7 +144,7 @@ runs/4.02_2026-11-20_1430/
   07_export/room_4.02.svg      (preview)
 ```
 
-### 5.4 Stage 1 – Frame Extraction (Proposed)
+### 5.4 Stage 1 – Frame Extraction (Implemented)
 
 Two consumers with different needs: detection benefits from many frames; VGGT can only process
 a limited number of frames at once (estimated 40–50 with 12 GB VRAM; the workstation has 16 GB,
@@ -164,7 +164,9 @@ Output in `01_frames/`: `frames/*.jpg`, `frames.json` (frame number, timestamp, 
 keyframe flag, video metadata), a keyframe contact sheet and a sharpness-over-time plot.
 Configurable: sampling rate, sharpness threshold, number of keyframes, target width.
 
-**Implemented** (start values still Proposed):
+**Implemented.** Start values **Decided** (3 Nov 2026): 3 fps, 1280 px width, 40 keyframes,
+sharpness ratio 0.5, minimum keyframe interval 1.5 s, minimum keyframe gap 0.75 s. The number
+of keyframes is re-checked against the VRAM limit in the stage 3 spike.
 
 - OpenCV applies the rotation metadata while decoding; frames are stored upright and the angle
   is only recorded. Timestamps come from the video's presentation times (variable frame rate).
@@ -284,7 +286,7 @@ any productive use.
 | Access to the three test rooms | BeSeated / office | Required for the spike and the evaluation |
 | GPU workstation setup (driver, CUDA 12.8+, WSL2) | self | RTX 50 series only works with current versions |
 | Update the privacy statement in the exposé (exclusion of persons instead of blurring) | supervisors | Consistency between exposé and implementation |
-| Stage 1 parameters (keyframe strategy, 3 fps start value) | self | Pending confirmation |
+| Stage 1 keyframe strategy (equal time windows, sharpest frame each); start values decided 3 Nov | self | Pending confirmation |
 
 ## 8. Next Steps
 

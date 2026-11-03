@@ -25,12 +25,15 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
       settings, run folder check, old debug images on failed re-runs, exact threshold
 - [x] Second code review: latest-run fallback by folder name, broken run folders skipped,
       YAML errors as user errors, room name whitespace, stale keyframe flags
-- [ ] Confirm the two review findings left unchanged (evaluate argument order, writing
+- [x] Confirm the two review findings left unchanged (evaluate argument order, writing
       blurry frames before dropping them), see development/00-project.md and 01-frames.md
-- [ ] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5,
+- [x] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5,
       minimum keyframe interval 1.5 s, minimum keyframe gap 0.75 s
 - [x] Write a short recording guide: draft in `recording-guide.md`
-- [ ] Review the recording guide; decide portrait vs. landscape after the stage 2/3 spike
+- [x] Review the recording guide (v0.2, 3 Nov)
+- [ ] Recording guide: give reasons for, or check on the office pilot video, the rules marked
+      *(unverified)* (10 s per turn, 30 fps, no HDR, no wide-angle, stabilization off)
+- [ ] Recording guide: decide portrait vs. landscape and screens on/off after the stage 2/3 spike
 - [ ] Record a pilot video of a real office room (several desks), following the guide
 - [x] Record 1–2 pilot videos of a room that is **not** an evaluation room; put them in
       `data/raw/pilot/`
@@ -84,5 +87,7 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 - [ ] Clarify who builds the import of the map file into the backend, and when
       (needed for the user study, H1/H3)
 - [ ] Clarify how editing time and corrections are measured (logs, stopwatch, screen recording)
+- [ ] Define when the recording time starts and stops for H1 (with or without preparation,
+      re-recordings counted?) and add it to the recording guide
 - [ ] Update the exposé: output is a BeSeated map file (JSON), not an SVG; privacy by
       excluding persons instead of blurring

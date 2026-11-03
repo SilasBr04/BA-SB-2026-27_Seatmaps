@@ -99,7 +99,7 @@ Consequences:
 | "Latest run" skips folders that cannot be loaded (invalid YAML, no `run` section, `run.created` not ISO 8601) with a warning instead of failing | One broken or foreign folder in `runs/` made every command without an explicit run folder fail, even if the newest run was fine | Implemented |
 | Invalid YAML in a config or run `config.yaml` is reported as a user error (message, exit code 1) | It crashed with a Python traceback, although a typo in a hand-edited config is a user error | Implemented |
 | Room names must not start or end with whitespace or contain control characters | `--room " 4.02"` was accepted, so the folder name and later the BeSeated element names (` 4.02-T1`) would not match the reference map | Implemented |
-| `seatmap evaluate <reference> [run_dir]` keeps the new argument order | The review flagged that the order changed against `main`. Kept: an optional positional (`run_dir`, default latest run) must come last, the README already shows this order, and evaluation is not implemented yet, so no existing calls break | Proposed |
+| `seatmap evaluate <reference> [run_dir]` keeps the new argument order | The review flagged that the order changed against `main`. Kept: an optional positional (`run_dir`, default latest run) must come last, the README already shows this order, and evaluation is not implemented yet, so no existing calls break. Confirmed 3 Nov | Decided |
 
 ## Windows setup without uv (3 Nov)
 

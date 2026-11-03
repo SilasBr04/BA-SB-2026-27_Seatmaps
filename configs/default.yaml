@@ -4,12 +4,12 @@
 # Values marked "proposed" are starting points, not confirmed (docs/technical-setup.md).
 
 frames:
-  sample_fps: 3           # proposed
-  target_width: 1280      # px, proposed
-  num_keyframes: 40       # proposed; VGGT estimate ~40-50 frames for 12 GB VRAM, workstation has 16 GB (to be measured)
-  min_sharpness_ratio: 0.5  # drop frames below this share of the mean Laplacian variance, proposed
-  min_keyframe_interval_s: 1.5  # short videos: at most one keyframe per 1.5 s (40 x 1.5 s = 60 s cutoff), proposed
-  min_keyframe_gap_s: 0.75  # adjacent keyframes at least this far apart (no near-duplicates), proposed
+  sample_fps: 3
+  target_width: 1280      # px
+  num_keyframes: 40       # VGGT estimate ~40-50 frames for 12 GB VRAM, workstation has 16 GB (to be measured)
+  min_sharpness_ratio: 0.5  # drop frames below this share of the mean Laplacian variance
+  min_keyframe_interval_s: 1.5  # short videos: at most one keyframe per 1.5 s (40 x 1.5 s = 60 s cutoff)
+  min_keyframe_gap_s: 0.75  # adjacent keyframes at least this far apart (no near-duplicates)
 
 detection:
   model: null             # YOLO26-seg weights (open)
