@@ -63,7 +63,11 @@ uv pip install -e ".[dev]"                     # light stages + dev tools
 # GPU workstation only:
 uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 uv pip install -e ".[gpu,dev]"
-# VGGT: install from its official repository; COLMAP fallback: uv pip install -e ".[colmap]"
+# VGGT without its pinned dependencies, so the cu128 PyTorch build is kept:
+git clone https://github.com/facebookresearch/vggt.git ~/vggt
+uv pip install --no-deps -e ~/vggt
+uv pip install huggingface_hub einops safetensors pillow
+uv pip install -e ".[dev,gpu,colmap]"          # COLMAP fallback (pycolmap)
 ```
 
 **Windows (PowerShell, without uv):** install Python 3.11 first
@@ -92,6 +96,48 @@ pytest                                         # make test
 ruff check src tests; ruff format --check src tests; mypy src tests   # make lint
 ruff check --fix src tests; ruff format src tests                     # make format
 ```
+
+## Working on the GPU workstation (WSL2)
+
+The GPU stages run in Ubuntu inside WSL2, in a separate clone of the repository in the Linux
+home folder (`~/BA-SB-2026-27_Seatmaps`), not in the Windows copy under `C:\Users\...`.
+
+**Get in, every time:**
+
+1. Open Ubuntu: Start menu → "Ubuntu", or type `wsl` in PowerShell / Windows Terminal.
+2. Go to the project and activate the venv:
+
+   ```bash
+   cd ~/BA-SB-2026-27_Seatmaps
+   source .venv/bin/activate                    # prompt shows (BA-SB-2026-27_Seatmaps)
+   git pull                                     # get changes pushed from Windows / the laptop
+   ```
+
+3. Optional check that the GPU is visible:
+
+   ```bash
+   python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+   ```
+
+Leave Ubuntu with `exit`. WSL shuts down on its own after a while; `wsl --shutdown` in
+PowerShell stops it immediately (e.g. to free RAM).
+
+**Moving files between Windows and Ubuntu:**
+
+- Windows drives are mounted in Ubuntu under `/mnt/c/...`. Raw videos are not in Git, so copy
+  them into the WSL clone:
+
+  ```bash
+  mkdir -p ~/BA-SB-2026-27_Seatmaps/data/raw
+  cp -r /mnt/c/Users/silas/PycharmProjects/BA-SB-2026-27_Seatmaps/data/raw/pilot ~/BA-SB-2026-27_Seatmaps/data/raw/
+  ```
+
+- From Windows, the Ubuntu files are in Explorer under `\\wsl$\Ubuntu\home\silas\` (also
+  listed as "Linux" in the sidebar), e.g. to look at debug images in `runs/`.
+- Do not work on the project directly under `/mnt/c`: file access across the mount is slow.
+
+Code moves between the two clones only via Git (commit + push on one side, `git pull` on the
+other).
 
 ## Usage
 

@@ -7,9 +7,9 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 
 - [x] Commit the current doc changes (`technical-setup.md`, `beseated-map-format.md`, this file)
 - [x] Laptop: install dev dependencies (`uv pip install -e ".[dev]"`), check `make test` runs
-- [ ] GPU workstation: driver, WSL2 + Ubuntu, Python 3.11, uv, clone repo (section 4.3)
-- [ ] GPU workstation: PyTorch with CUDA 12.8+, verify the GPU with the check in step 6 of section 4.3
-- [ ] GPU workstation: install VGGT and COLMAP / pycolmap
+- [x] GPU workstation: driver, WSL2 + Ubuntu, Python 3.11, uv, clone repo (section 4.3)
+- [x] GPU workstation: PyTorch with CUDA 12.8+, verify the GPU with the check in step 6 of section 4.3
+- [x] GPU workstation: install VGGT and COLMAP / pycolmap
 
 ## 1. Frame extraction — implemented, needs a pilot video to tune
 

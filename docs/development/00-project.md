@@ -14,6 +14,7 @@ where they were written down; "—" means the reason still has to be recorded.
 | 3 Nov 2026 | Hardware specs corrected: the GPU workstation has an RTX 5060 Ti with 16 GB; the earlier "RTX 5070, 12 GB" was wrong information | — |
 | 3 Nov 2026 | Code review of the stage 1 branch: "latest run" lookup and CLI exit codes fixed (see below) | — |
 | 3 Nov 2026 | Code review, remaining findings: `run` section of configs and run folder check (see below) | — |
+| 3 Nov 2026 | GPU workstation set up: WSL2 + Ubuntu, Python 3.11, PyTorch cu128, VGGT, pycolmap (see below) | — |
 
 ## Scope and workflow
 
@@ -111,6 +112,34 @@ it held only pip. Fix: install Python 3.11, recreate `.venv` with `py -3.11 -m v
 | Decision | Why | Status |
 |---|---|---|
 | README setup also covers Windows PowerShell without uv (venv via `py -3.11`, `Activate.ps1`, execution policy), the PyCharm interpreter choice, and the direct commands behind the `make` targets | uv was not installed and the README only showed uv; `make` does not exist on Windows; the `.venv\Scripts\activate` hint does not work in PowerShell; PyCharm's own venv caused the problem | Implemented |
+
+## GPU workstation setup in WSL2 (3 Nov)
+
+Setup steps from `technical-setup.md`, section 4.3, carried out on the GPU workstation.
+
+- **WSL2:** the first attempt failed. `wsl --status` reported that WSL2 could not start because
+  the *Virtual Machine Platform* feature was missing, although Task Manager showed CPU
+  virtualization as enabled. After WSL was installed again and Windows restarted, Ubuntu ran.
+- **Python:** Ubuntu ships Python 3.14.4 as system Python; Python 3.11.18 was installed with
+  `uv python install 3.11` and the venv created with `uv venv --python 3.11`.
+- **Repository:** cloned into the Linux home folder (`~/BA-SB-2026-27_Seatmaps`), not under
+  `/mnt/c`, because file access across the Windows mount is slow.
+- **PyTorch:** 2.11.0+cu128 from the `cu128` index; `torch.cuda.is_available()` is `True`,
+  device RTX 5060 Ti. `nvidia-smi` works inside Ubuntu through the Windows driver
+  (KMD 621.01, 16 311 MiB); no driver is installed inside Ubuntu.
+- **Project:** `uv pip install -e ".[dev,gpu,colmap]"`; 56 tests pass on Python 3.11 in WSL.
+- **VGGT:** cloned from `facebookresearch/vggt` into `~/vggt`, installed with
+  `uv pip install --no-deps -e ~/vggt` plus `huggingface_hub einops safetensors pillow`.
+  `--no-deps` was used as a precaution against VGGT's pinned dependencies replacing the cu128
+  PyTorch build with an older one (the pins themselves were not checked). Afterwards PyTorch
+  was still 2.11.0+cu128. The `facebook/VGGT-1B` weights (5.03 GB) download and load onto the
+  GPU with 5.03 GB VRAM allocated; no inference has been run yet.
+- **COLMAP fallback:** pycolmap 4.2.1 (from the `colmap` extra); the COLMAP binary is not
+  installed.
+
+| Decision | Why | Status |
+|---|---|---|
+| VGGT is installed from source without its dependencies (`--no-deps`), its runtime dependencies are added by hand | Keeps the PyTorch cu128 build that the RTX 50 series needs | Implemented |
 
 **Licensing note:** Ultralytics YOLO is AGPL-3.0 (fine for the thesis, commercial use in
 BeSeated would need an Enterprise license). VGGT and SAM 3 licenses still to be checked.

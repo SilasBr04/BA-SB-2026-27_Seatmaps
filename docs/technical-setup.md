@@ -96,7 +96,11 @@ Code is kept in sync between both machines via Git. Data and run outputs are not
 5. Install PyTorch with CUDA 12.8+ (from the official PyTorch index, `cu128` or newer).
 6. Verify the GPU: `python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"`
 7. Install the project dependencies (section 6).
-8. Install VGGT from its official repository; install COLMAP (or `pycolmap`) as fallback.
+8. Install VGGT from its official repository with `--no-deps` (so the cu128 PyTorch build is
+   kept) plus `huggingface_hub einops safetensors pillow`; install `pycolmap` as fallback.
+
+**Done on the GPU workstation (3 Nov 2026):** PyTorch 2.11.0+cu128, VGGT-1B loads on the GPU,
+pycolmap 4.2.1; details in [`development/00-project.md`](development/00-project.md).
 
 ## 5. Pipeline Architecture
 
@@ -284,7 +288,6 @@ any productive use.
 | `floor` values for the test rooms (`locationId`, floor name and number) | BeSeated | Needed for a schema-valid file; placeholders until then |
 | Measuring editing time and corrections in the BeSeated editor (logs available? otherwise stopwatch / screen recording) | BeSeated | Measurement data for H1 and H3 |
 | Access to the three test rooms | BeSeated / office | Required for the spike and the evaluation |
-| GPU workstation setup (driver, CUDA 12.8+, WSL2) | self | RTX 50 series only works with current versions |
 | Update the privacy statement in the exposé (exclusion of persons instead of blurring) | supervisors | Consistency between exposé and implementation |
 | Stage 1 keyframe strategy (equal time windows, sharpest frame each); start values decided 3 Nov | self | Pending confirmation |
 
