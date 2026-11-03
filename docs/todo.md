@@ -16,6 +16,13 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 - [x] Stage implemented (`python -m seatmap frames <run_dir>`), tested on a synthetic video
 - [x] Run it on the pilot video and check `01_frames/debug/` (contact sheet, sharpness plot)
 - [x] Add a minimum gap between adjacent keyframes (pilot run showed near-duplicates)
+- [x] Code review fixes: optimal instead of greedy keyframe selection, "latest run" by exact
+      creation time, CLI exit code when no stage ran
+- [x] Re-run the pilot video with the new keyframe selection and compare with pilot run 2
+      (pilot run 3: 17 instead of 16 keyframes, the extra one is a similar, less sharp view)
+- [ ] Stage 3 spike: compare VGGT with all filled windows vs. only the sharper keyframes
+- [x] Remaining code review findings: `run` section in configs, type checks for `frames`
+      settings, run folder check, old debug images on failed re-runs, exact threshold
 - [ ] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5,
       minimum keyframe interval 1.5 s, minimum keyframe gap 0.75 s
 - [x] Write a short recording guide: draft in `recording-guide.md`

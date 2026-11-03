@@ -1,3 +1,4 @@
+import itertools
 import json
 from datetime import datetime
 from pathlib import Path
@@ -117,6 +118,29 @@ def test_invalid_settings_are_rejected() -> None:
         Settings.from_config(DEFAULTS | {"sample_fps": 0})
 
 
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("num_keyframes", None),
+        ("sample_fps", "three"),
+        ("num_keyframes", 40.9),
+        ("target_width", True),
+    ],
+)
+def test_wrongly_typed_settings_are_reported_by_name(name: str, value: object) -> None:
+    with pytest.raises(UserError, match=name):
+        Settings.from_config(DEFAULTS | {name: value})
+
+
+def test_whole_number_written_as_float_is_accepted() -> None:
+    assert Settings.from_config(DEFAULTS | {"num_keyframes": 40.0}).num_keyframes == 40
+
+
+def test_missing_frames_section_is_reported() -> None:
+    with pytest.raises(UserError, match="'frames' section"):
+        Settings.from_config(None)
+
+
 def test_missing_settings_are_reported_by_name() -> None:
     config = {k: v for k, v in DEFAULTS.items() if k != "min_keyframe_interval_s"}
     with pytest.raises(UserError, match="min_keyframe_interval_s"):
@@ -141,6 +165,17 @@ def test_failed_rerun_leaves_no_stale_manifest(tmp_path: Path) -> None:
     with pytest.raises(UserError):
         stage.execute(run)
     assert not (run.stage_dir("frames") / "frames.json").exists()
+    assert not list(run.debug_dir("frames").iterdir())  # no figures of the earlier run
+
+
+def test_reported_threshold_is_the_one_frames_were_compared_with(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    stage.execute(run)
+    data = json.loads((run.stage_dir("frames") / "frames.json").read_text(encoding="utf-8"))
+    summary, frames = data["summary"], data["frames"]
+    threshold = summary["sharpness_threshold"]
+    assert threshold == DEFAULTS["min_sharpness_ratio"] * summary["mean_sharpness"]
+    assert all(f["kept"] == (f["sharpness"] >= threshold) for f in frames)
 
 
 def test_frames_are_written_to_non_ascii_paths(tmp_path: Path) -> None:
@@ -194,12 +229,25 @@ def test_adjacent_keyframes_keep_the_minimum_gap() -> None:
         Frame(1, 0.9, 50.0, kept=True),  # sharpest of window 0, at the border
         Frame(2, 1.1, 60.0, kept=True),  # sharpest of window 1, but only 0.2 s after frame 1
         Frame(3, 1.8, 20.0, kept=True),
-        Frame(4, 2.1, 70.0, kept=True),  # only kept frame of window 2, 0.3 s after frame 3
+        Frame(4, 2.1, 70.0, kept=True),  # sharpest of window 2, only 0.3 s after frame 3
         Frame(5, 3.0, 5.0, kept=True),
     ]
     windows = select_keyframes(frames, 3, min_gap_s=0.5)  # windows of 1 s
-    assert [w.index if w else None for w in windows] == [1, 3, 5]
-    assert [f.index for f in frames if f.keyframe] == [1, 3, 5]
+    # greedy would take 1, 3, 5 (sharpness 75); 0, 2, 4 also keeps the gap and is sharper
+    assert [w.index if w else None for w in windows] == [0, 2, 4]
+    assert [f.index for f in frames if f.keyframe] == [0, 2, 4]
+    times = [w.timestamp_s for w in windows if w]
+    assert all(b - a >= 0.5 for a, b in itertools.pairwise(times))
+
+
+def test_less_sharp_frame_is_taken_so_the_next_window_is_not_blocked() -> None:
+    frames = [
+        Frame(0, 0.9, 50.0, kept=True),
+        Frame(1, 1.1, 60.0, kept=True),  # sharpest of window 0, but blocks frame 2
+        Frame(2, 1.5, 5.0, kept=True),  # only kept frame of window 1
+    ]
+    windows = select_keyframes(frames, 2, min_gap_s=0.5)  # windows [0.9,1.2) [1.2,1.5]
+    assert [w.index if w else None for w in windows] == [0, 2]
 
 
 def test_window_with_only_too_close_frames_stays_empty() -> None:
@@ -210,5 +258,12 @@ def test_window_with_only_too_close_frames_stays_empty() -> None:
     ]
     windows = select_keyframes(frames, 2, min_gap_s=0.5)  # windows [0.9,1.45) [1.45,2.0]
     assert [w.index if w else None for w in windows] == [1, 2]
-    windows = select_keyframes([*frames[:2], Frame(2, 1.5, 5.0, kept=True)], 2, min_gap_s=0.5)
-    assert [w.index if w else None for w in windows] == [1, None]
+
+    frames = [
+        Frame(0, 0.0, 99.0, kept=False),
+        Frame(1, 0.8, 50.0, kept=True),  # only kept frame of window 0
+        Frame(2, 1.0, 60.0, kept=True),  # only kept frame of window 1, 0.2 s after frame 1
+        Frame(3, 3.0, 5.0, kept=True),
+    ]
+    windows = select_keyframes(frames, 3, min_gap_s=0.5)  # windows of 1 s
+    assert [w.index if w else None for w in windows] == [None, 2, 3]

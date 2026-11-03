@@ -22,6 +22,7 @@ from seatmap.errors import UserError
 
 RUNS_ROOT = Path("runs")
 CONFIG_FILENAME = "config.yaml"
+RUN_SECTION = "run"  # section of the frozen config written by create_run
 DEBUG_DIRNAME = "debug"
 MAX_ROOM_NAME_LENGTH = 26  # element names <= 30 characters, minus "-T" and two digits
 FORBIDDEN_ROOM_CHARS = set(r'<>:"/\|?*')
@@ -74,18 +75,26 @@ def create_run(
     """Create a new run folder and freeze the effective config into it.
 
     A second run of the same room within the same minute gets a suffix (`-2`, `-3`, ...).
+    The exact creation time (with UTC offset) is stored as `run.created`; `latest_run` sorts
+    by it, because the folder name only has minute resolution and local time.
     """
     check_room_name(room)
+    if RUN_SECTION in config:
+        # e.g. the frozen config.yaml of an earlier run, passed as --config to repeat it
+        print(f"Note: the '{RUN_SECTION}' section of the config is replaced by this run's values")
     if not video.is_file():
         raise UserError(f"video not found: {video}")
-    timestamp = (now or datetime.now()).strftime("%Y-%m-%d_%H%M")
+    created = (now or datetime.now()).astimezone()  # naive values are taken as local time
+    timestamp = created.strftime("%Y-%m-%d_%H%M")
     root = runs_root / f"{room}_{timestamp}"
     suffix = 1
     while root.exists():
         suffix += 1
         root = runs_root / f"{room}_{timestamp}-{suffix}"
     root.mkdir(parents=True)
-    config = {"run": {"room": room, "video": str(video.resolve())}, **config}
+    run_section = {"room": room, "video": str(video.resolve()), "created": created.isoformat()}
+    rest = {key: value for key, value in config.items() if key != RUN_SECTION}
+    config = {RUN_SECTION: run_section, **rest}
     (root / CONFIG_FILENAME).write_text(
         yaml.safe_dump(config, sort_keys=False, allow_unicode=True), encoding="utf-8"
     )
@@ -108,18 +117,39 @@ def check_room_name(room: str) -> None:
 def load_run(root: Path) -> Run:
     if not (root / CONFIG_FILENAME).is_file():
         raise UserError(f"not a run folder (no {CONFIG_FILENAME}): {root}")
-    return Run(root, load_yaml(root / CONFIG_FILENAME))
+    config = load_yaml(root / CONFIG_FILENAME)
+    section = config.get(RUN_SECTION)
+    if not isinstance(section, dict) or not {"room", "video"} <= section.keys():
+        raise UserError(
+            f"not a run folder ({CONFIG_FILENAME} has no '{RUN_SECTION}' section with room "
+            f"and video; create runs with: seatmap init <video> --room <name>): {root}"
+        )
+    return Run(root, config)
 
 
 def latest_run(runs_root: Path = RUNS_ROOT) -> Run:
-    """The most recently created run, by the timestamp in the folder name."""
+    """The most recently created run, by `run.created` in its config.
+
+    Runs created before `run.created` existed fall back to the modification time of their
+    config.yaml. Both are compared as absolute points in time, so runs of different rooms
+    in the same minute and the switch from summer to winter time are ordered correctly.
+    """
     runs = []
     for path in runs_root.glob("*/" + CONFIG_FILENAME):
         match = RUN_NAME.search(path.parent.name)
         if match:
-            runs.append((match.group(1), int(match.group(2) or 1), path.parent))
+            run = load_run(path.parent)
+            runs.append((created_at(run), int(match.group(2) or 1), run))
     if not runs:
         raise UserError(
             f"no runs in {runs_root}; create one with: seatmap run <video> --room <name>"
         )
-    return load_run(max(runs)[2])
+    return max(runs, key=lambda entry: entry[:2])[2]
+
+
+def created_at(run: Run) -> float:
+    """Creation time of a run as a POSIX timestamp."""
+    created = run.config[RUN_SECTION].get("created")
+    if created is not None:
+        return datetime.fromisoformat(str(created)).timestamp()
+    return (run.root / CONFIG_FILENAME).stat().st_mtime

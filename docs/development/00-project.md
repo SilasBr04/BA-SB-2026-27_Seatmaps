@@ -12,6 +12,8 @@ where they were written down; "—" means the reason still has to be recorded.
 | 26 Oct 2026 | Technical setup v0.3: output changed from SVG to the BeSeated map format (JSON) | `ff1c0ea` |
 | 2 Nov 2026 | Stage 1 implemented ([`01-frames.md`](01-frames.md)) | `ff2d1b9` |
 | 3 Nov 2026 | Hardware specs corrected: the GPU workstation has an RTX 5060 Ti with 16 GB; the earlier "RTX 5070, 12 GB" was wrong information | — |
+| 3 Nov 2026 | Code review of the stage 1 branch: "latest run" lookup and CLI exit codes fixed (see below) | — |
+| 3 Nov 2026 | Code review, remaining findings: `run` section of configs and run folder check (see below) | — |
 
 ## Scope and workflow
 
@@ -79,6 +81,15 @@ Consequences:
   40–50 frames at once, and with it the choice of 40 keyframes in stage 1
   ([`01-frames.md`](01-frames.md), decision 10). With 16 GB more keyframes may fit; the actual
   limit is measured in the stage 3 spike.
+
+## Run folders and CLI: fixes from the code review (3 Nov)
+
+| Decision | Why | Status |
+|---|---|---|
+| Each run stores its exact creation time with UTC offset (`run.created` in `config.yaml`); "latest run" (stage commands without a run folder) is chosen by it, not by the folder name. Older runs without it fall back to the modification time of their `config.yaml` | The folder name only has minute resolution and local time: two rooms started in the same minute were ordered alphabetically, and after the switch to winter time a newer run could sort before an older one, so a stage could silently re-process the wrong room | Implemented |
+| `seatmap run` / `resume` without `--until` fail (exit code 1) if not a single stage ran; with `--until` every requested stage must run | `resume --from detection` returned 0 although nothing was computed, while `seatmap detection` returned 1 for the same situation; scripts would treat it as success | Implemented |
+| The `run` section of a run's config is always written by the tool: a `run` section in the default or experiment config is replaced (with a note on the console), not merged | A `run:` key in an experiment config silently overwrote the room and video, and the stage then crashed. It is replaced rather than rejected, so the frozen `config.yaml` of an earlier run can be passed as `--config` to repeat an experiment | Implemented |
+| A folder only counts as a run folder if its `config.yaml` has a `run` section with room and video | A copy of `configs/default.yaml` in a folder was accepted and failed later inside the stage with a traceback | Implemented |
 
 **Licensing note:** Ultralytics YOLO is AGPL-3.0 (fine for the thesis, commercial use in
 BeSeated would need an Enterprise license). VGGT and SAM 3 licenses still to be checked.

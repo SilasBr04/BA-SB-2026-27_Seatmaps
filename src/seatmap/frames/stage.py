@@ -12,18 +12,21 @@ Steps (docs/technical-setup.md, section 5.4):
 3. Resize to `target_width` (downscaling only) and write every sampled frame to disk.
 4. Sharpness = variance of the Laplacian of the resized grayscale frame. Frames below
    `min_sharpness_ratio` x the mean sharpness are dropped and their files deleted.
-5. Keyframes: the sampled time span is split into equal windows, one per keyframe; the sharpest
-   kept frame of each window becomes a keyframe. Windows without kept frames stay empty.
+5. Keyframes: the sampled time span is split into equal windows, one per keyframe; normally the
+   sharpest kept frame of each window becomes a keyframe. Windows without kept frames stay empty.
    Number of windows: `num_keyframes`, but at most one per `min_keyframe_interval_s`, so short
    videos get fewer keyframes (cutoff at num_keyframes x interval, e.g. 40 x 1.5 s = 60 s).
    Adjacent keyframes must be at least `min_keyframe_gap_s` apart: the sharpest frame of two
    neighbouring windows can otherwise sit right at their shared border and show the same view.
-   A window whose kept frames are all too close to the previous keyframe stays empty.
+   With this gap, the selection is optimized over the whole video: as many windows as possible
+   get a keyframe, then total sharpness is maximized (a slightly less sharp frame may be taken
+   so the next window is not blocked). A window that cannot get a keyframe stays empty.
 """
 
 from __future__ import annotations
 
 import json
+from bisect import bisect_right
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -40,6 +43,9 @@ from seatmap.runs import Run
 FRAMES_DIRNAME = "frames"
 FRAMES_JSON = "frames.json"
 JPEG_QUALITY = 95
+CONTACT_SHEET = "keyframes.jpg"
+SHARPNESS_PLOT = "sharpness.png"
+DEBUG_FILES = (CONTACT_SHEET, SHARPNESS_PLOT)
 
 
 @dataclass(frozen=True)
@@ -52,18 +58,20 @@ class Settings:
     min_keyframe_gap_s: float
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]) -> Settings:
+    def from_config(cls, config: Any) -> Settings:
+        if not isinstance(config, dict):
+            raise UserError("frames: the 'frames' section of the run config is missing")
         missing = [name for name in cls.__dataclass_fields__ if name not in config]
         if missing:
             # e.g. a run created before the key existed; its frozen config.yaml must be updated
             raise UserError(f"frames: missing settings in the run config: {', '.join(missing)}")
         settings = cls(
-            sample_fps=float(config["sample_fps"]),
-            target_width=int(config["target_width"]),
-            num_keyframes=int(config["num_keyframes"]),
-            min_sharpness_ratio=float(config["min_sharpness_ratio"]),
-            min_keyframe_interval_s=float(config["min_keyframe_interval_s"]),
-            min_keyframe_gap_s=float(config["min_keyframe_gap_s"]),
+            sample_fps=number(config, "sample_fps"),
+            target_width=whole_number(config, "target_width"),
+            num_keyframes=whole_number(config, "num_keyframes"),
+            min_sharpness_ratio=number(config, "min_sharpness_ratio"),
+            min_keyframe_interval_s=number(config, "min_keyframe_interval_s"),
+            min_keyframe_gap_s=number(config, "min_keyframe_gap_s"),
         )
         if settings.sample_fps <= 0 or settings.target_width <= 0 or settings.num_keyframes <= 0:
             raise UserError("frames: sample_fps, target_width and num_keyframes must be > 0")
@@ -77,6 +85,21 @@ class Settings:
         if not 0 <= settings.min_sharpness_ratio <= 1:  # <= 1 keeps at least the sharpest frame
             raise UserError("frames: min_sharpness_ratio must be between 0 and 1")
         return settings
+
+
+def number(config: dict[str, Any], name: str) -> float:
+    value = config[name]
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise UserError(f"frames: {name} must be a number, got {value!r}")
+    return float(value)
+
+
+def whole_number(config: dict[str, Any], name: str) -> int:
+    """An integer setting; 40.0 is accepted, 40.9 is rejected instead of truncated."""
+    value = number(config, name)
+    if not value.is_integer():
+        raise UserError(f"frames: {name} must be a whole number, got {config[name]!r}")
+    return int(value)
 
 
 @dataclass(frozen=True)
@@ -105,13 +128,17 @@ def execute(run: Run) -> None:
     out_dir = run.stage_dir("frames")
     frames_dir = out_dir / FRAMES_DIRNAME
     frames_dir.mkdir(exist_ok=True)
-    # stage may be re-run; remove the manifest first so a failed re-run leaves none behind
+    debug_dir = run.debug_dir("frames")
+    # stage may be re-run; remove the previous outputs first so a failed re-run leaves no
+    # manifest or debug figures behind that belong to other settings
     (out_dir / FRAMES_JSON).unlink(missing_ok=True)
+    for name in DEBUG_FILES:
+        (debug_dir / name).unlink(missing_ok=True)
     for old in frames_dir.glob("*.jpg"):
         old.unlink()
 
     video, frames = sample_frames(run.video, settings, frames_dir)
-    threshold = drop_blurry(frames, settings.min_sharpness_ratio, out_dir)
+    mean, threshold = drop_blurry(frames, settings.min_sharpness_ratio, out_dir)
     span = frames[-1].timestamp_s - frames[0].timestamp_s
     windows = select_keyframes(frames, keyframe_count(span, settings), settings.min_keyframe_gap_s)
 
@@ -124,7 +151,7 @@ def execute(run: Run) -> None:
         "keyframes": len(keyframes),
         "keyframe_windows": len(windows),
         "empty_keyframe_windows": sum(1 for w in windows if w is None),
-        "mean_sharpness": float(np.mean([f.sharpness for f in frames])),
+        "mean_sharpness": mean,
         "sharpness_threshold": threshold,
     }
     data = {
@@ -135,9 +162,8 @@ def execute(run: Run) -> None:
     }
     (out_dir / FRAMES_JSON).write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    debug_dir = run.debug_dir("frames")
-    debug.write_contact_sheet(keyframes, out_dir, debug_dir / "keyframes.jpg")
-    debug.write_sharpness_plot(frames, threshold, windows, debug_dir / "sharpness.png")
+    debug.write_contact_sheet(keyframes, out_dir, debug_dir / CONTACT_SHEET)
+    debug.write_sharpness_plot(frames, threshold, windows, debug_dir / SHARPNESS_PLOT)
 
     print(
         f"frames: {summary['sampled']} sampled, {summary['kept']} kept, "
@@ -224,16 +250,20 @@ def sharpness(image: MatLike) -> float:
     return round(float(cv2.Laplacian(gray, cv2.CV_64F).var()), 2)
 
 
-def drop_blurry(frames: list[Frame], ratio: float, out_dir: Path) -> float:
-    """Mark frames below `ratio` x mean sharpness as dropped, delete their files; return the
-    threshold."""
-    threshold = ratio * float(np.mean([f.sharpness for f in frames]))
+def drop_blurry(frames: list[Frame], ratio: float, out_dir: Path) -> tuple[float, float]:
+    """Mark frames below `ratio` x mean sharpness as dropped, delete their files.
+
+    Returns the mean sharpness and the threshold, unrounded: the reported threshold is exactly
+    the value the frames were compared with.
+    """
+    mean = float(np.mean([f.sharpness for f in frames]))
+    threshold = ratio * mean
     for frame in frames:
         frame.kept = frame.sharpness >= threshold
         if not frame.kept and frame.file is not None:
             (out_dir / frame.file).unlink(missing_ok=True)
             frame.file = None
-    return round(threshold, 2)
+    return mean, threshold
 
 
 def keyframe_count(span_s: float, settings: Settings) -> int:
@@ -245,8 +275,13 @@ def keyframe_count(span_s: float, settings: Settings) -> int:
 def select_keyframes(
     frames: list[Frame], num_keyframes: int, min_gap_s: float = 0.0
 ) -> list[Frame | None]:
-    """Split the sampled time span into equal windows and flag the sharpest kept frame of each
-    that is at least `min_gap_s` after the previous keyframe.
+    """Split the sampled time span into equal windows and flag at most one kept frame per
+    window, with adjacent keyframes at least `min_gap_s` apart.
+
+    The choice is optimal over the whole video, not greedy per window: first as many windows
+    as possible get a keyframe, then the total sharpness is maximized. Without gap conflicts
+    this is the sharpest kept frame of each window. A greedy choice could take a frame at the
+    right edge of a window and so block every candidate of the next one.
 
     Returns one entry per window (None for windows without a suitable kept frame).
     """
@@ -259,20 +294,35 @@ def select_keyframes(
         slot = floor_ratio(frame.timestamp_s - start, width) if width > 0 else 0
         windows[min(slot, num_keyframes - 1)].append(frame)
 
-    chosen: list[Frame | None] = []
-    previous: Frame | None = None
+    # Longest path over the kept frames in time order. score[i] = (keyframes, total
+    # sharpness) of the best selection ending with frame i; best_upto[i] = index of the
+    # best score among frames 0..i, so each predecessor lookup is a binary search.
+    ordered = [f for window in windows for f in sorted(window, key=lambda f: f.timestamp_s)]
+    times = [f.timestamp_s for f in ordered]
+    score: list[tuple[int, float]] = []
+    previous: list[int | None] = []
+    best_upto: list[int] = []
+    first = 0  # index of the first frame of the current window in `ordered`
     for window in windows:
-        candidates = [
-            f
-            for f in window
-            if previous is None or f.timestamp_s - previous.timestamp_s >= min_gap_s - 1e-6
-        ]
-        best = max(candidates, key=lambda f: f.sharpness, default=None)
-        if best is not None:
-            best.keyframe = True
-            previous = best
-        chosen.append(best)
-    return chosen
+        for i in range(first, first + len(window)):
+            # predecessors: frames of earlier windows that are at least min_gap_s earlier
+            last = min(bisect_right(times, times[i] - min_gap_s + 1e-6), first) - 1
+            pred = best_upto[last] if last >= 0 else None
+            count, total = score[pred] if pred is not None else (0, 0.0)
+            score.append((count + 1, total + ordered[i].sharpness))
+            previous.append(pred)
+        for i in range(first, first + len(window)):
+            better = not best_upto or score[i] > score[best_upto[-1]]
+            best_upto.append(i if better else best_upto[-1])
+        first += len(window)
+
+    chosen_ids: set[int] = set()
+    node = best_upto[-1] if best_upto else None
+    while node is not None:
+        chosen_ids.add(id(ordered[node]))
+        ordered[node].keyframe = True
+        node = previous[node]
+    return [next((f for f in window if id(f) in chosen_ids), None) for window in windows]
 
 
 def floor_ratio(a: float, b: float) -> int:

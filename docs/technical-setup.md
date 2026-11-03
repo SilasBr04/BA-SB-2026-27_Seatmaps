@@ -179,7 +179,9 @@ Configurable: sampling rate, sharpness threshold, number of keyframes, target wi
   always get 40 windows, a 28 s video gets 18.
 - Adjacent keyframes are at least `min_keyframe_gap_s` (0.75 s) apart; otherwise the sharpest
   frames of two neighbouring windows can sit at their shared border and show the same view.
-  A window whose kept frames are all too close to the previous keyframe stays empty.
+  With the gap, keyframes are chosen over the whole video, not greedily per window: as many
+  windows as possible get a keyframe, then total sharpness is maximized. A window that cannot
+  get a keyframe without breaking the gap stays empty.
 
 How stage 1 was developed and why: [`development/01-frames.md`](development/01-frames.md).
 Recording rules for the person filming: [`recording-guide.md`](recording-guide.md) (draft).

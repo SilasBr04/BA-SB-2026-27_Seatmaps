@@ -28,6 +28,9 @@ for VGGT.
 | 2 Nov 2026 | Stage 1 implemented, tested on a synthetic video | `ff2d1b9` |
 | 2 Nov 2026 | First pilot video (home room, 28 s, portrait): run `test_2026-11-02_1144` | — |
 | 2 Nov 2026 | Minimum gap between adjacent keyframes added; re-run `test_2026-11-02_1153`; recording guide drafted | — |
+| 3 Nov 2026 | Code review of the branch: keyframe selection with gap changed from greedy to optimal (see below) | — |
+| 3 Nov 2026 | Pilot video re-run with the optimal selection: run `test_2026-11-03_1653` | — |
+| 3 Nov 2026 | Remaining code review findings fixed: settings validation, debug figures on re-run, exact threshold (see below) | — |
 | 3 Nov 2026 | VRAM figure corrected: workstation has 16 GB, not 12 GB; basis of decision 10 marked as wrong | — |
 
 ## Decisions
@@ -46,7 +49,8 @@ for VGGT.
 | 10 | 40 keyframes | Chosen as the upper end that fits VGGT on 12 GB VRAM. The 12 GB was wrong information (workstation has 16 GB, corrected 3 Nov, see [`00-project.md`](00-project.md)); 40 is kept as a safe start value, the actual limit and whether more keyframes help is checked in the stage 3 spike | Proposed |
 | 11 | At most one keyframe per 1.5 s (`min_keyframe_interval_s`) | Short videos would otherwise get very narrow windows and many near-identical keyframes. 40 × 1.5 s = 60 s is the cutoff; this also gives the minimum video length in the recording guide | Proposed |
 | 12 | A window without a kept frame stays empty | Taking a blurry frame would give VGGT a poor image; fewer keyframes are better than bad ones. Counted in the `frames.json` summary | Implemented |
-| 13 | Adjacent keyframes at least 0.75 s apart (`min_keyframe_gap_s`); a window whose kept frames are all too close stays empty | Found in the pilot run (see below) | Proposed |
+| 13 | Adjacent keyframes at least 0.75 s apart (`min_keyframe_gap_s`); a window that cannot get a keyframe without breaking the gap stays empty | Found in the pilot run (see below) | Proposed |
+| 15 | With the gap, keyframes are chosen optimally over the whole video instead of greedily per window: first as many filled windows as possible, then the highest total sharpness | Code review, 3 Nov (see below) | Implemented |
 | 14 | Debug output: keyframe contact sheet and sharpness-over-time plot | Quick visual check per run; usable as thesis figures | Implemented |
 
 ## Pilot run 1 (`runs/test_2026-11-02_1144`)
@@ -89,6 +93,61 @@ rule cannot detect that; it is covered by the recording guide ("keep moving stea
 **Rejected alternative:** compare image content (e.g. histogram or feature similarity) to find
 duplicates. More precise, but adds a second tunable threshold; the time gap solves the observed
 problem with one parameter. Revisit if VGGT results suffer from redundant keyframes.
+
+## Code review (3 Nov): greedy keyframe selection
+
+The first gap implementation went through the windows in order and took the sharpest allowed
+frame of each. The review found that this can empty a window unnecessarily: if the sharpest
+frame of window i sits at its right border, it can block every candidate of window i+1,
+although a slightly less sharp frame in window i would have left room for both. Each lost
+window is one VGGT slot fewer.
+
+**Change (decision 15):** the selection is solved exactly as a longest path over the kept
+frames in time order: maximize the number of filled windows first, the total sharpness second.
+Without gap conflicts this gives the same result as before (the sharpest kept frame of each
+window). Runtime is O(n log n) in the number of kept frames.
+
+### Pilot run 3 (`runs/test_2026-11-03_1653`), same video, optimal selection
+
+Same video and settings as pilot run 2 (85 sampled, 62 kept, 18 windows). Replaying the greedy
+selection on this run's `frames.json` reproduces pilot run 2 exactly, so the numbers compare
+directly:
+
+| Metric | Greedy (run 2) | Optimal (run 3) |
+|---|---|---|
+| Keyframes / empty windows | 16 / 2 | 17 / 1 |
+| Total sharpness of keyframes | 1414.5 | 1436.9 |
+| Smallest gap between adjacent keyframes | 0.99 s | 0.99 s |
+
+Findings:
+
+1. 11 of 18 windows keep the same keyframe; the others shift to earlier frames. The extra
+   window is filled with #281 (9.4 s, sharpness 37, just above the threshold of 30.5). Its
+   neighbour becomes #241 (8.0 s, 54) instead of #271 (122).
+2. Contact sheet: #241 and #281 show nearly the same view (chair in front of the wall mirror;
+   #281 shows a little more of the doorway). So on this video the extra keyframe adds little
+   new content. Both also show the person filming in the mirror (known from pilot run 1).
+3. #591/#621 replace #601/#631. They are still similar views (sofa and roof window), because
+   the camera barely moves there, as already seen in pilot run 2.
+
+Conclusion: the change does what it should (one more filled window, never a smaller gap), but
+on this video the gain is small, and the extra keyframe is a low-sharpness, similar view.
+Whether "fill as many windows as possible" is better for VGGT than "fewer but sharper"
+keyframes is checked in the stage 3 spike. Also check on a real office video.
+
+**Rejected alternative:** keep the greedy choice and document it as a limitation. Simpler, but
+it wastes keyframes exactly where blur already removed frames.
+
+## Code review (3 Nov): smaller fixes
+
+| Decision | Why | Status |
+|---|---|---|
+| `frames` settings are type-checked: numbers must be numbers, `target_width` and `num_keyframes` whole numbers (`40.0` is accepted, `40.9` is rejected instead of truncated to 40); errors name the setting | `null` or text values crashed with a Python traceback instead of a clear error, and fractional values were silently truncated | Implemented |
+| A re-run deletes the old contact sheet and sharpness plot before it starts, like `frames.json` | After a failed re-run the figures of the previous run stayed in `debug/` and could be taken for figures of the current settings | Implemented |
+| `frames.json` reports the exact (unrounded) sharpness threshold; the mean is computed once | The threshold was rounded to 2 decimals for the report but frames were compared with the unrounded value, so a dropped frame could appear to lie above the reported threshold | Implemented |
+
+Re-running stage 1 on pilot run 3 after these fixes gave the same frames and keyframes;
+only the reported threshold changed from 30.52 to 30.5218 (unrounded).
 
 ## Open
 

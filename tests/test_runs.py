@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -64,6 +64,55 @@ def test_same_minute_runs_get_a_suffix_and_latest_is_found(tmp_path: Path) -> No
     assert latest_run(tmp_path).root == second.root
 
 
+def test_latest_run_uses_exact_creation_time_not_folder_name(tmp_path: Path) -> None:
+    video = make_video(tmp_path)
+    create_run("4.10", video, {}, runs_root=tmp_path, now=datetime(2026, 11, 20, 14, 30, 10))
+    newer = create_run(
+        "4.02", video, {}, runs_root=tmp_path, now=datetime(2026, 11, 20, 14, 30, 40)
+    )
+    # same minute, both without suffix: "4.10_..." sorts last by name but is older
+    assert latest_run(tmp_path).root == newer.root
+
+
+def test_latest_run_handles_switch_to_winter_time(tmp_path: Path) -> None:
+    video = make_video(tmp_path)
+    summer, winter = timezone(timedelta(hours=2)), timezone(timedelta(hours=1))
+    create_run(
+        "4.01", video, {}, runs_root=tmp_path, now=datetime(2026, 10, 25, 2, 50, tzinfo=summer)
+    )
+    # 40 minutes later the clock shows 02:30 again
+    newer = create_run(
+        "4.02", video, {}, runs_root=tmp_path, now=datetime(2026, 10, 25, 2, 30, tzinfo=winter)
+    )
+    assert latest_run(tmp_path).root == newer.root
+
+
+def test_runs_without_creation_time_fall_back_to_config_mtime(tmp_path: Path) -> None:
+    video = make_video(tmp_path)
+    old = create_run("4.10", video, {}, runs_root=tmp_path, now=datetime(2026, 11, 20, 14, 30))
+    config = old.root / CONFIG_FILENAME
+    config.write_text(
+        config.read_text(encoding="utf-8").replace("  created:", "  x_created:"), encoding="utf-8"
+    )
+    newer = create_run("4.02", video, {}, runs_root=tmp_path, now=datetime(2030, 1, 1, 0, 0))
+    assert latest_run(tmp_path).root == newer.root
+
+
+def test_run_section_in_config_is_replaced_by_the_runs_values(tmp_path: Path) -> None:
+    video = make_video(tmp_path)
+    old = {"run": {"room": "4.10", "video": "elsewhere.mp4"}, "frames": {"sample_fps": 3}}
+    run = load_run(create_run("4.02", video, old, runs_root=tmp_path).root)
+    assert run.room == "4.02"
+    assert run.video == video.resolve()
+    assert run.config["frames"] == {"sample_fps": 3}
+
+
+def test_folder_with_foreign_config_is_not_a_run(tmp_path: Path) -> None:
+    (tmp_path / CONFIG_FILENAME).write_text("frames:\n  sample_fps: 3\n", encoding="utf-8")
+    with pytest.raises(UserError, match="not a run folder"):
+        load_run(tmp_path)
+
+
 @pytest.mark.parametrize("room", ["", "x" * 27, "4/02"])
 def test_invalid_room_names_are_rejected(tmp_path: Path, room: str) -> None:
     with pytest.raises(UserError):
@@ -126,6 +175,9 @@ def test_cli_run_stops_at_first_unimplemented_stage(
     # an explicitly requested stage that is not implemented is a failure
     assert main(["detection", "--runs-root", str(tmp_path / "runs")]) == 1
     assert main(["resume", "--until", "detection", "--runs-root", str(tmp_path / "runs")]) == 1
+    # without --until, a range that stops before any stage ran is a failure as well
+    assert main(["resume", "--from", "detection", "--runs-root", str(tmp_path / "runs")]) == 1
+    assert main(["resume", "--runs-root", str(tmp_path / "runs")]) == 0
     assert main(["evaluate", "ref.json", "--runs-root", str(tmp_path / "runs")]) == 1
 
 

@@ -66,16 +66,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             config = load_config(args.config, default=args.default_config)
             run = create_run(args.room, args.video, config, runs_root=args.runs_root)
             print(f"Run folder: {run.root}")
-            # without --until, `run` and `resume` stop at the first unimplemented stage
             if args.command == "run":
-                complete = run_stages(run, stage_names(stop=args.until)) or args.until is None
+                complete = run_until(run, stage_names(stop=args.until), args.until)
         elif args.command == "resume":
-            ran = run_stages(open_run(args), stage_names(args.start, args.until))
-            complete = ran or args.until is None
+            complete = run_until(open_run(args), stage_names(args.start, args.until), args.until)
         elif args.command == "evaluate":
             evaluate.execute(open_run(args), args.reference)
         else:
-            complete = run_stages(open_run(args), [args.command])
+            complete = run_stages(open_run(args), [args.command]) == 1
     except UserError as error:
         print(f"Error: {error}")
         return 1
@@ -93,17 +91,27 @@ def open_run(args: argparse.Namespace) -> Run:
     return run
 
 
-def run_stages(run: Run, names: Sequence[str]) -> bool:
+def run_until(run: Run, names: Sequence[str], until: str | None) -> bool:
+    """Run a range of stages for `run` / `resume`; True if the command succeeded.
+
+    With --until, every requested stage must run. Without it, the command stops at the first
+    unimplemented stage and succeeds if at least one stage ran.
+    """
+    ran = run_stages(run, names)
+    return ran == len(names) if until is not None else ran > 0
+
+
+def run_stages(run: Run, names: Sequence[str]) -> int:
     """Run the stages in order; stop at the first one that is not implemented yet.
 
-    Returns False if a stage was not implemented, so not all requested stages ran.
+    Returns the number of stages that ran.
     """
-    for name in names:
+    for done, name in enumerate(names):
         print(f"--- {name}")
         try:
             STAGES[name](run)
         except NotImplementedError:
             print(f"Stopped: stage '{name}' is not implemented yet.")
-            return False
+            return done
         print(f"Results: {run.stage_dir(name)}")
-    return True
+    return len(names)
