@@ -23,6 +23,10 @@ done, Claude can implement that stage. Decisions go into `technical-setup.md` af
 - [ ] Stage 3 spike: compare VGGT with all filled windows vs. only the sharper keyframes
 - [x] Remaining code review findings: `run` section in configs, type checks for `frames`
       settings, run folder check, old debug images on failed re-runs, exact threshold
+- [x] Second code review: latest-run fallback by folder name, broken run folders skipped,
+      YAML errors as user errors, room name whitespace, stale keyframe flags
+- [ ] Confirm the two review findings left unchanged (evaluate argument order, writing
+      blurry frames before dropping them), see development/00-project.md and 01-frames.md
 - [ ] Confirm the start values: 3 fps, 1280 px width, 40 keyframes, sharpness ratio 0.5,
       minimum keyframe interval 1.5 s, minimum keyframe gap 0.75 s
 - [x] Write a short recording guide: draft in `recording-guide.md`

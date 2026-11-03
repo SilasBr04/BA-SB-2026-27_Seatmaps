@@ -109,6 +109,10 @@ def check_room_name(room: str) -> None:
             f"room name '{room}' is {len(room)} characters long, "
             f"at most {MAX_ROOM_NAME_LENGTH} are allowed"
         )
+    if room != room.strip():
+        raise UserError(f"room name '{room}' must not start or end with whitespace")
+    if any(not char.isprintable() for char in room):
+        raise UserError(f"room name {room!r} must not contain control characters")
     if FORBIDDEN_ROOM_CHARS & set(room):
         forbidden = "".join(sorted(FORBIDDEN_ROOM_CHARS))
         raise UserError(f"room name '{room}' must not contain any of {forbidden}")
@@ -130,16 +134,24 @@ def load_run(root: Path) -> Run:
 def latest_run(runs_root: Path = RUNS_ROOT) -> Run:
     """The most recently created run, by `run.created` in its config.
 
-    Runs created before `run.created` existed fall back to the modification time of their
-    config.yaml. Both are compared as absolute points in time, so runs of different rooms
-    in the same minute and the switch from summer to winter time are ordered correctly.
+    Runs created before `run.created` existed fall back to the timestamp in their folder name
+    (local time, minute resolution), not to the modification time of config.yaml, which
+    changes whenever the file is edited. Times are compared as absolute points in time, so
+    runs of different rooms in the same minute and the switch from summer to winter time are
+    ordered correctly. Folders that cannot be loaded are skipped with a warning, so one broken
+    run does not block commands on the others.
     """
     runs = []
     for path in runs_root.glob("*/" + CONFIG_FILENAME):
         match = RUN_NAME.search(path.parent.name)
         if match:
-            run = load_run(path.parent)
-            runs.append((created_at(run), int(match.group(2) or 1), run))
+            try:
+                run = load_run(path.parent)
+                created = created_at(run, match.group(1))
+            except UserError as error:
+                print(f"Warning: skipping {path.parent}: {error}")
+                continue
+            runs.append((created, int(match.group(2) or 1), run))
     if not runs:
         raise UserError(
             f"no runs in {runs_root}; create one with: seatmap run <video> --room <name>"
@@ -147,9 +159,16 @@ def latest_run(runs_root: Path = RUNS_ROOT) -> Run:
     return max(runs, key=lambda entry: entry[:2])[2]
 
 
-def created_at(run: Run) -> float:
-    """Creation time of a run as a POSIX timestamp."""
+def created_at(run: Run, folder_timestamp: str) -> float:
+    """Creation time of a run as a POSIX timestamp.
+
+    `folder_timestamp` is the `YYYY-MM-DD_HHMM` part of the folder name, used when the config
+    has no `run.created` (runs created before it existed).
+    """
     created = run.config[RUN_SECTION].get("created")
-    if created is not None:
+    if created is None:
+        return datetime.strptime(folder_timestamp, "%Y-%m-%d_%H%M").astimezone().timestamp()
+    try:
         return datetime.fromisoformat(str(created)).timestamp()
-    return (run.root / CONFIG_FILENAME).stat().st_mtime
+    except ValueError as error:
+        raise UserError(f"run.created is not an ISO 8601 time: {created!r}") from error

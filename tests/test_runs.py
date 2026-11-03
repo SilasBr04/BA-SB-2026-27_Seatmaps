@@ -87,15 +87,41 @@ def test_latest_run_handles_switch_to_winter_time(tmp_path: Path) -> None:
     assert latest_run(tmp_path).root == newer.root
 
 
-def test_runs_without_creation_time_fall_back_to_config_mtime(tmp_path: Path) -> None:
+def test_runs_without_creation_time_fall_back_to_folder_name(tmp_path: Path) -> None:
     video = make_video(tmp_path)
-    old = create_run("4.10", video, {}, runs_root=tmp_path, now=datetime(2026, 11, 20, 14, 30))
-    config = old.root / CONFIG_FILENAME
-    config.write_text(
-        config.read_text(encoding="utf-8").replace("  created:", "  x_created:"), encoding="utf-8"
-    )
-    newer = create_run("4.02", video, {}, runs_root=tmp_path, now=datetime(2030, 1, 1, 0, 0))
+    newer = create_run("4.02", video, {}, runs_root=tmp_path, now=datetime(2026, 11, 20, 14, 30))
+    old = create_run("4.10", video, {}, runs_root=tmp_path, now=datetime(2026, 11, 19, 9, 0))
+    for run in (newer, old):
+        config = run.root / CONFIG_FILENAME
+        text = config.read_text(encoding="utf-8").replace("  created:", "  x_created:")
+        config.write_text(text, encoding="utf-8")
+    # the old run's config.yaml was edited last, but that must not make it the latest run
     assert latest_run(tmp_path).root == newer.root
+
+
+@pytest.mark.parametrize(
+    "broken",
+    [
+        "run: [unclosed\n",  # invalid YAML
+        "frames: {}\n",  # no run section
+        "run:\n  room: x\n  video: v\n  created: yesterday\n",  # invalid creation time
+    ],
+)
+def test_latest_run_skips_broken_run_folders(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], broken: str
+) -> None:
+    good = create_run("4.02", make_video(tmp_path), {}, runs_root=tmp_path)
+    bad = tmp_path / "4.10_2030-01-01_0000"
+    bad.mkdir()
+    (bad / CONFIG_FILENAME).write_text(broken, encoding="utf-8")
+    assert latest_run(tmp_path).root == good.root
+    assert "Warning: skipping" in capsys.readouterr().out
+
+
+def test_invalid_yaml_is_a_user_error(tmp_path: Path) -> None:
+    (tmp_path / CONFIG_FILENAME).write_text("run: [unclosed\n", encoding="utf-8")
+    with pytest.raises(UserError, match="invalid YAML"):
+        load_run(tmp_path)
 
 
 def test_run_section_in_config_is_replaced_by_the_runs_values(tmp_path: Path) -> None:
@@ -113,7 +139,7 @@ def test_folder_with_foreign_config_is_not_a_run(tmp_path: Path) -> None:
         load_run(tmp_path)
 
 
-@pytest.mark.parametrize("room", ["", "x" * 27, "4/02"])
+@pytest.mark.parametrize("room", ["", "x" * 27, "4/02", " 4.02", "4.02\t", "4.\n02"])
 def test_invalid_room_names_are_rejected(tmp_path: Path, room: str) -> None:
     with pytest.raises(UserError):
         create_run(room, make_video(tmp_path), {}, runs_root=tmp_path)

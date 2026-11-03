@@ -39,6 +39,7 @@ def write_contact_sheet(keyframes: Sequence[Frame], frames_root: Path, path: Pat
             continue
         image = read_image(frames_root / frame.file)
         if image is None:
+            print(f"Warning: keyframe image missing or unreadable, skipped: {frame.file}")
             continue
         height = round(image.shape[0] * THUMB_WIDTH / image.shape[1])
         thumb = cv2.resize(image, (THUMB_WIDTH, height), interpolation=cv2.INTER_AREA)

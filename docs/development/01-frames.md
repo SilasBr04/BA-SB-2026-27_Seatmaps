@@ -146,7 +146,16 @@ it wastes keyframes exactly where blur already removed frames.
 | A re-run deletes the old contact sheet and sharpness plot before it starts, like `frames.json` | After a failed re-run the figures of the previous run stayed in `debug/` and could be taken for figures of the current settings | Implemented |
 | `frames.json` reports the exact (unrounded) sharpness threshold; the mean is computed once | The threshold was rounded to 2 decimals for the report but frames were compared with the unrounded value, so a dropped frame could appear to lie above the reported threshold | Implemented |
 
-Re-running stage 1 on pilot run 3 after these fixes gave the same frames and keyframes;
+Second review (3 Nov):
+
+| Decision | Why | Status |
+|---|---|---|
+| A run config without a `frames` section is reported as a user error | `run.config["frames"]` raised a `KeyError` traceback before the check meant to report a missing section could run | Implemented |
+| `select_keyframes` first clears all keyframe flags, then flags its choice; the result per window is read from the flags (no matching by `id()`) | Called twice on the same frames, flags from the first call survived, so the keyframe count and contact sheet would include stale keyframes | Implemented |
+| The contact sheet prints a warning for a keyframe file that is missing or unreadable | It was skipped silently, so the sheet could show fewer tiles than keyframes without any hint | Implemented |
+| Not changed: blurry frames are still written to disk first and deleted after the threshold is known; the contact sheet re-reads keyframes from disk | The threshold depends on the mean sharpness of all frames, so avoiding the writes would mean either keeping all encoded frames in memory or decoding the video twice. The cost (one JPEG write per dropped frame, 40 reads for the sheet) is small compared with stages 2 and 3 | Proposed |
+
+Re-running stage 1 on pilot run 3 after the first review's fixes gave the same frames and keyframes;
 only the reported threshold changed from 30.52 to 30.5218 (unrounded).
 
 ## Open

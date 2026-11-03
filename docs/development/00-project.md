@@ -86,10 +86,20 @@ Consequences:
 
 | Decision | Why | Status |
 |---|---|---|
-| Each run stores its exact creation time with UTC offset (`run.created` in `config.yaml`); "latest run" (stage commands without a run folder) is chosen by it, not by the folder name. Older runs without it fall back to the modification time of their `config.yaml` | The folder name only has minute resolution and local time: two rooms started in the same minute were ordered alphabetically, and after the switch to winter time a newer run could sort before an older one, so a stage could silently re-process the wrong room | Implemented |
+| Each run stores its exact creation time with UTC offset (`run.created` in `config.yaml`); "latest run" (stage commands without a run folder) is chosen by it, not by the folder name. Older runs without it fall back to the timestamp in the folder name (see second review below) | The folder name only has minute resolution and local time: two rooms started in the same minute were ordered alphabetically, and after the switch to winter time a newer run could sort before an older one, so a stage could silently re-process the wrong room | Implemented |
 | `seatmap run` / `resume` without `--until` fail (exit code 1) if not a single stage ran; with `--until` every requested stage must run | `resume --from detection` returned 0 although nothing was computed, while `seatmap detection` returned 1 for the same situation; scripts would treat it as success | Implemented |
 | The `run` section of a run's config is always written by the tool: a `run` section in the default or experiment config is replaced (with a note on the console), not merged | A `run:` key in an experiment config silently overwrote the room and video, and the stage then crashed. It is replaced rather than rejected, so the frozen `config.yaml` of an earlier run can be passed as `--config` to repeat an experiment | Implemented |
 | A folder only counts as a run folder if its `config.yaml` has a `run` section with room and video | A copy of `configs/default.yaml` in a folder was accepted and failed later inside the stage with a traceback | Implemented |
+
+## Run folders and CLI: second code review (3 Nov)
+
+| Decision | Why | Status |
+|---|---|---|
+| Runs without `run.created` are ordered by the timestamp in their folder name, not by the modification time of `config.yaml` | The stage's own error message asks the user to edit an old run's `config.yaml`; that changed its modification time and made the old run the "latest run", so the next command without a run folder would process the wrong room | Implemented |
+| "Latest run" skips folders that cannot be loaded (invalid YAML, no `run` section, `run.created` not ISO 8601) with a warning instead of failing | One broken or foreign folder in `runs/` made every command without an explicit run folder fail, even if the newest run was fine | Implemented |
+| Invalid YAML in a config or run `config.yaml` is reported as a user error (message, exit code 1) | It crashed with a Python traceback, although a typo in a hand-edited config is a user error | Implemented |
+| Room names must not start or end with whitespace or contain control characters | `--room " 4.02"` was accepted, so the folder name and later the BeSeated element names (` 4.02-T1`) would not match the reference map | Implemented |
+| `seatmap evaluate <reference> [run_dir]` keeps the new argument order | The review flagged that the order changed against `main`. Kept: an optional positional (`run_dir`, default latest run) must come last, the README already shows this order, and evaluation is not implemented yet, so no existing calls break | Proposed |
 
 **Licensing note:** Ultralytics YOLO is AGPL-3.0 (fine for the thesis, commercial use in
 BeSeated would need an Enterprise license). VGGT and SAM 3 licenses still to be checked.

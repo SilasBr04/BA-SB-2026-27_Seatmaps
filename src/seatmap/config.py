@@ -15,7 +15,10 @@ DEFAULT_CONFIG = Path("configs/default.yaml")
 def load_yaml(path: Path) -> dict[str, Any]:
     if not path.is_file():
         raise UserError(f"config file not found: {path}")
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as error:
+        raise UserError(f"{path}: invalid YAML: {error}") from error
     if not isinstance(data, dict):
         raise UserError(f"{path}: top level must be a mapping")
     return data

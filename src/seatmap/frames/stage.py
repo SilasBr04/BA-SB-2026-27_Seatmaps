@@ -124,7 +124,7 @@ class Frame:
 
 
 def execute(run: Run) -> None:
-    settings = Settings.from_config(run.config["frames"])
+    settings = Settings.from_config(run.config.get("frames"))
     out_dir = run.stage_dir("frames")
     frames_dir = out_dir / FRAMES_DIRNAME
     frames_dir.mkdir(exist_ok=True)
@@ -285,6 +285,8 @@ def select_keyframes(
 
     Returns one entry per window (None for windows without a suitable kept frame).
     """
+    for frame in frames:  # flags of an earlier selection must not survive
+        frame.keyframe = False
     start, end = frames[0].timestamp_s, frames[-1].timestamp_s
     width = (end - start) / num_keyframes
     windows: list[list[Frame]] = [[] for _ in range(num_keyframes)]
@@ -316,13 +318,11 @@ def select_keyframes(
             best_upto.append(i if better else best_upto[-1])
         first += len(window)
 
-    chosen_ids: set[int] = set()
     node = best_upto[-1] if best_upto else None
     while node is not None:
-        chosen_ids.add(id(ordered[node]))
         ordered[node].keyframe = True
         node = previous[node]
-    return [next((f for f in window if id(f) in chosen_ids), None) for window in windows]
+    return [next((f for f in window if f.keyframe), None) for window in windows]
 
 
 def floor_ratio(a: float, b: float) -> int:

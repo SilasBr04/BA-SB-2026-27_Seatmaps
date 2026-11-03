@@ -10,7 +10,14 @@ from cv2.typing import MatLike
 
 from seatmap.errors import UserError
 from seatmap.frames import stage
-from seatmap.frames.stage import Frame, Settings, floor_ratio, keyframe_count, select_keyframes
+from seatmap.frames.stage import (
+    Frame,
+    Settings,
+    execute,
+    floor_ratio,
+    keyframe_count,
+    select_keyframes,
+)
 from seatmap.runs import Run, create_run
 
 FPS = 30
@@ -139,6 +146,20 @@ def test_whole_number_written_as_float_is_accepted() -> None:
 def test_missing_frames_section_is_reported() -> None:
     with pytest.raises(UserError, match="'frames' section"):
         Settings.from_config(None)
+
+
+def test_run_config_without_frames_section_is_reported(tmp_path: Path) -> None:
+    run = Run(tmp_path, {"run": {"room": "4.02", "video": "room.mp4"}})
+    with pytest.raises(UserError, match="'frames' section"):
+        execute(run)
+
+
+def test_reselection_clears_earlier_keyframe_flags() -> None:
+    frames = [Frame(i, float(i), 10.0 + i, kept=True) for i in range(4)]
+    select_keyframes(frames, 4)
+    windows = select_keyframes(frames, 1)
+    assert [w.index if w else None for w in windows] == [3]
+    assert [f.index for f in frames if f.keyframe] == [3]
 
 
 def test_missing_settings_are_reported_by_name() -> None:
